@@ -22,6 +22,7 @@ from datetime import datetime
 
 from django.db.utils import IntegrityError
 
+from jsonview.decorators import json_view
 
 # Create your views here.
 
@@ -96,7 +97,7 @@ def results_page(driver, temporary_book):
 
                     if word[i] == '-' and word[i + 1] == '-':
                         writing = False
-                    if writing:
+                    if writing and word[i] != '\n' and word[i] != '\r':
                         category += word[i]
 
                 if category:
@@ -128,21 +129,36 @@ def book_object_filling(request, id=''):
         book = Book.objects.get(id=request.POST.get('id'))
     else:
         book = Book()
+        id = request.POST.get("search_idx")
+        #for obj in Temporary_book._meta.get_fields():
+        #    if obj.name == "physical_location":
+        #        print(request.POST)
+        #        setattr(book, obj.name, Shelve.objects.get(name=request.POST.get("physical_location")))
+        #    elif obj.name == "price" and request.POST.get('price') == '':
+        #        pass
+        #    elif obj.name == "bought_date":
+        #        if request.POST.get("bought_date"):
+        #            date = datetime.strptime(request.POST.get(obj.name), '%d-%m-%Y').strftime('%Y-%m-%d')
+        #            setattr(book, obj.name, date)
+        #    else:
+        #        setattr(book, obj.name, request.POST.get(obj.name))
 
     for obj in Temporary_book._meta.get_fields():
         if obj.name == "physical_location":
-            setattr(book, obj.name, Shelve.objects.get(name=request.POST.get("physical_location")))
-        elif obj.name == "price" and request.POST.get('price') == '':
+            setattr(book, obj.name, Shelve.objects.get(name=request.POST.get(f"prefix{id}-physical_location")))
+        elif obj.name == "price" and request.POST.get(f"prefix{id}-price") == '':
             pass
         elif obj.name == "bought_date":
-            if not request.POST.get("bought_date") == '':
+            if request.POST.get(f"prefix{id}-bought_date"):
                 date = datetime.strptime(request.POST.get(obj.name), '%d-%m-%Y').strftime('%Y-%m-%d')
                 setattr(book, obj.name, date)
         else:
-            setattr(book, obj.name, request.POST.get(obj.name))
+            setattr(book, obj.name, request.POST.get(f"prefix{id}-{obj.name}"))
+
     book.save()
 
 
+@json_view
 def add_book_view(request, *args, **kwargs):
     if request.is_ajax():
         if request.POST.get('adding'):
@@ -152,51 +168,50 @@ def add_book_view(request, *args, **kwargs):
             var = Temporary_book.objects.get(search_number=request.POST.get("search_idx"))
             var.delete()
             return JsonResponse({}, status=200)
-        else:
-            tmp_data = request.body.decode()
-            comma_position = tmp_data.find(';')
+        elif request.POST.get('mode') == 'start_searching_book_g_library':
+            idx = request.POST.get('search_idx')
+            ISBN = request.POST.get('isbn')
 
-            if tmp_data[:comma_position] == "wait_signal":
-                idx = tmp_data[comma_position + 1:]
-                temp_obj = Temporary_book.objects.get(search_number=idx)
-                if temp_obj.is_complete_search:
+            try:
+                val = Temporary_book.objects.get(search_number=idx)
+                if val:
+                    val.delete()
+            except ObjectDoesNotExist:
+                pass
 
-                    data = {"status": 1}
+            temporary_book = Temporary_book()
+            temporary_book.search_number = idx
+            temporary_book.ISBN = ISBN
+            temporary_book.save()
 
-                    book_data = Book()
-                    for obj in Temporary_book._meta.get_fields():
-                        setattr(book_data, obj.name, temp_obj.__getattribute__(obj.name))
-                    book_form = Book_form(instance=book_data)
-                    string_form = create_book_form(book_form, idx)
-                    data["book_form"] = string_form
+            thread_ = threading.Thread(target=search_in_global_library(ISBN, "ISBN", temporary_book), daemon=True)
+            thread_.start()
 
-                    return JsonResponse(data, status=200)
-                else:
-                    return JsonResponse({"status": 0}, status=200)
+            return JsonResponse({"search_index": idx}, status=200)
+        elif request.POST.get('mode') == 'searching_book_g_library_results':
+            idx = request.POST.get('search_idx')
+            temp_obj = Temporary_book.objects.get(search_number=idx)
+            if temp_obj.is_complete_search:
+
+                data = {"status": 1}
+
+                book_data = Book()
+                for obj in Temporary_book._meta.get_fields():
+                    setattr(book_data, obj.name, temp_obj.__getattribute__(obj.name))
+                book_form = Book_form(instance=book_data, prefix="prefix"+str(request.POST.get('search_idx')))
+                string_form = create_book_form(book_form, idx)
+                data["book_form"] = string_form
+
+                return JsonResponse(data, status=200)
             else:
-                comma_position = tmp_data.find(';')
-                idx = tmp_data[:comma_position]
-                ISBN = tmp_data[comma_position + 1:]
+                return JsonResponse({"status": 0}, status=200)
 
-                try:
-                    val = Temporary_book.objects.get(search_number=idx)
-                    if val:
-                        val.delete()
-                except ObjectDoesNotExist:
-                    pass
+    context = {'datalist_author': [m['author'] for m in Book.objects.values('author')],
+               'datalist_location': [m['name'] for m in Shelve.objects.values('name')],
+               'datalist_publisher': [m['publisher'] for m in Book.objects.values('publisher')],
+               'datalist_category': [m['name'] for m in BookCategory.objects.values('name')]}
 
-                temporary_book = Temporary_book()
-                temporary_book.search_number = idx
-                temporary_book.ISBN = ISBN
-                temporary_book.save()
-
-                thread_ = threading.Thread(target=search_in_global_library(ISBN, "ISBN", temporary_book), daemon=True)
-                thread_.start()
-
-                return JsonResponse({"search_index": idx}, status=200)
-    else:
-        return render(request, 'add_books.html',
-                      {"shelves_name": [m['name'] for m in Shelve.objects.values('name', 'details')]})
+    return render(request, 'add_books.html', context)
 
 
 def main_site(request, *args, **kwargs):
@@ -205,6 +220,7 @@ def main_site(request, *args, **kwargs):
 
 def add_shelves(request, *args, **kwargs):
     if request.method == 'POST':
+        print("asd")
         form = Shelve_form(request.POST)
         if form.is_valid():
             obj = Shelve.objects.create()
@@ -247,10 +263,11 @@ def create_book_form(book_form, search_idx, shelve_name=''):
         elif name == 'physical_location':
             string_form += '<div class="col-md-12">' + f'<label for="id_{name}" class="form-label-sm"> {field.label} </label>'
 
-            idx_value_start = string_representation.find("value=")
-            idx_value_end = string_representation.find(" ", 44)
-            string_representation = string_representation[:idx_value_start] + "value=\"" + str(
-                shelve_name) + "\"" + string_representation[idx_value_end:]
+            if shelve_name:
+                idx_value_start = string_representation.find("value=")
+                idx_value_end = string_representation.find(" ", 44)
+                string_representation = string_representation[:idx_value_start] + "value=\"" + str(
+                    shelve_name) + "\"" + string_representation[idx_value_end:]
         else:
             string_form += '<div class="col-md-6">' + f'<label for="id_{name}" class="form-label-sm"> {field.label} </label>'
 
@@ -279,11 +296,10 @@ def create_book_form(book_form, search_idx, shelve_name=''):
 
 def search_books_view(request, *args, **kwargs):
     context = {'form': Search_form()}
-
     if request.is_ajax():
         if request.POST.get('mode') == "search_book":
             book_object = Book.objects.get(id=request.POST.get('id'))
-            book_form = Book_form(instance=book_object)
+            book_form = Book_form(instance=book_object, prefix="prefix"+str(request.POST.get('id')))
             shelve_name = book_object.physical_location
             string_form = create_book_form(book_form, request.POST.get('id'), shelve_name)
             return JsonResponse({"book_form": string_form}, status=200)
@@ -334,6 +350,11 @@ def search_books_view(request, *args, **kwargs):
         context["localization"] = localization
         context["category"] = category
 
+    context['datalist_author'] = [m['author'] for m in Book.objects.values('author')]
+    context['datalist_location'] = [m['name'] for m in Shelve.objects.values('name')]
+    context['datalist_publisher'] = [m['publisher'] for m in Book.objects.values('publisher')]
+    context['datalist_category'] = [m['name'] for m in BookCategory.objects.values('name')]
+
     return render(request, 'search_books.html', context)
 
 
@@ -352,13 +373,16 @@ def search_shelves_view(request, *args, **kwargs):
             print(request.POST)
 
             idx = [m['id'] for m in Shelve.objects.filter(
-                Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values('id')]
+                Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values(
+                'id')]
 
             names = [m['name'] for m in Shelve.objects.filter(
-                Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values('name')]
+                Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values(
+                'name')]
 
             details = [m['details'] for m in Shelve.objects.filter(
-                Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values('details')]
+                Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values(
+                'details')]
 
             return JsonResponse({"idx": idx, "names": names, "details": details, "length": len(idx)}, status=200)
 
@@ -378,8 +402,37 @@ def search_shelves_view(request, *args, **kwargs):
 
 
 def search_category_view(request, *args, **kwargs):
-    form = Book_category_search_form()
-    return render(request, 'search_category.html', {"form": form})
+    if request.is_ajax():
+        if request.POST.get('mode') == "change_book":
+            category = BookCategory.objects.get(id=request.POST.get('id'))
+
+            for obj in BookCategory._meta.get_fields():
+                setattr(category, obj.name, request.POST.get(obj.name))
+            category.save()
+
+            return JsonResponse({"changed_name": request.POST.get('name')}, status=200)
+
+        elif request.POST.get('mode') == "search_chosen":
+            print(request.POST)
+
+            idx = [m['id'] for m in BookCategory.objects.filter(name__contains=request.POST.get('name')).values('id')]
+            names = [m['name'] for m in
+                     BookCategory.objects.filter(name__contains=request.POST.get('name')).values('name')]
+
+            return JsonResponse({"idx": idx, "names": names, "length": len(idx)}, status=200)
+
+        else:
+            BookCategory.objects.get(id=request.POST.get('id')).delete()
+            return JsonResponse({}, status=200)
+
+    else:
+        form = Book_category_search_form()
+        objects = BookCategory.objects.values()
+
+        return render(request, 'search_category.html',
+                      {"form____": form,
+                       "idx": [m['id'] for m in objects.values("id")],
+                       "names": [m['name'] for m in objects.values("name")]})
 
 
 def handle_object(mode, idx):

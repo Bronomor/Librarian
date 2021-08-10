@@ -20,6 +20,44 @@
 
 {% block main_article %}
 
+    <datalist id="id_category_list"></datalist>
+    <datalist id="id_localization_list"></datalist>
+    <datalist id="id_publisher_list"></datalist>
+    <datalist id="id_author_list"></datalist>
+
+    <script type="text/javascript">
+        let list = document.getElementById("id_author_list")
+        let option;
+        {% for elem in datalist_author%}
+            option = document.createElement('option')
+            option.value = "{{elem}}"
+            list.appendChild(option);
+        {% endfor %}
+
+        list = document.getElementById("id_publisher_list")
+            {% for elem in datalist_publisher %}
+                option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option)
+            {% endfor %}
+
+        list = document.getElementById("id_localization_list")
+            {% for elem in datalist_location %}
+                console.log("{{elem}}")
+                option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option)
+            {% endfor %}
+
+        list = document.getElementById("id_category_list")
+            {% for elem in datalist_category %}
+                option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option)
+            {% endfor %}
+
+    </script>
+
     <script type="text/javascript">
         window.onload = load;
         function load() {
@@ -114,7 +152,7 @@
     <div id="results">
         <script>
             function change_book_data(idx){
-                let form_data = new FormData(document.getElementById("book_container"+idx))
+                let form_data = new FormData(document.getElementById("book_form"+idx))
                     form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
                     form_data.append('id', idx)
                     form_data.append('mode', 'change_book')
@@ -149,7 +187,7 @@
                     url: "/search_books",
                     data: form_data,
                     success: function (response) {
-                        let container = document.getElementById("book"+idx)
+                        let container = document.getElementById("book_form"+idx)
                         while (container.firstChild) {
                             container.removeChild(container.lastChild);
                             console.log("asdas")
@@ -166,9 +204,8 @@
             }
 
             function show_book_details(idx){
-                let book_container = document.getElementById("book_container"+idx)
+                let book_container = document.getElementById("book_form"+idx)
                 if (!book_container){
-
                     document.getElementById("book_show"+idx).innerText = "up"
 
                     let form_data = new FormData()
@@ -181,17 +218,17 @@
                         url: "/search_books",
                         data: form_data,
                         success: function (response) {
-                            if (!document.getElementById("book_container" + idx)) {
-                                document.getElementById("book" + idx).className = "results_block_clicked"
+                            if (!document.getElementById("book_form" + idx)) {
+                                document.getElementById("container_book" + idx).className = "results_block_clicked"
                                 form_ = document.createElement("form")
-                                form_.id = "book_container" + idx
+                                form_.id = "book_form" + idx
                                 form_.className = "search_page_edit_form"
-                                document.getElementById("book" + idx).appendChild(form_)
+                                document.getElementById("container_book" + idx).appendChild(form_)
 
                                 form_.insertAdjacentHTML('afterbegin', response.book_form)
 
                                 $(function () {
-                                    $('#book_container' + idx + ' #id_bought_date').datepicker({
+                                    $('#book_form' + idx + ' #id_prefix'+ idx +'-bought_date').datepicker({
                                         'format': 'dd-mm-yyyy',
                                         'autoclose': true
                                     });
@@ -213,7 +250,6 @@
                                 }
 
                                 form_.appendChild(save_button)
-                                form_.appendChild(delete_button)
                                 form_.appendChild(delete_button)
                             }
                         },
@@ -238,7 +274,7 @@
                 col.className="col"
 
                 let div = document.createElement("div");
-                div.id = "book" + idx
+                div.id = "container_book" + idx
                 div.className = "results_block"
                 div.onclick = function (){
                     show_book_details(idx)
@@ -254,14 +290,12 @@
                 show_button.className = "btn btn-light btn-sm"
                 show_button.innerText  = "down"
                 show_button.onclick = function (){
-                    let book_case = document.getElementById("book"+idx)
+                    let book_case = document.getElementById("container_book"+idx)
                     if (book_case.className === "results_block_clicked"){
-                        document.getElementById("book_container"+idx).hidden = true
                         book_case.className = "results_block"
                         this.innerText = "down"
                     }
-                    else if(document.getElementById("book_container"+idx)){
-                        document.getElementById("book_container"+idx).hidden = false
+                    else if(document.getElementById("container_book"+idx)){
                         book_case.className = "results_block_clicked"
                         this.innerText = "up"
                     }

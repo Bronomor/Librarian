@@ -1,37 +1,58 @@
 let HANDLE_SHELVE_WINDOW = null
 let HANDLE_CATEGORY_WINDOW = null
 let interval_shelves_search;
+let interval_category_search;
 
 
-function check_shelve_change(){
-
-    let elem = HANDLE_SHELVE_WINDOW.document.getElementById("something_change").innerText
-    if(elem){
+function check_shelve_change(search_idx){
+    if(HANDLE_SHELVE_WINDOW.document.getElementById("something_change").innerText) {
         let old_name = HANDLE_SHELVE_WINDOW.document.getElementById("old_shelve_name").innerText
         let new_name = HANDLE_SHELVE_WINDOW.document.getElementById("new_shelve_name").innerText
         if (old_name !== new_name) HANDLE_SHELVE_WINDOW.document.getElementById("something_change").innerText = ''
 
-        //let data_set = $("#id_physical_location_list #id_physical_location_list")
-        //console.log(data_set)
-        //let childrens = data_set.children
-        //console.log(childrens)
-        //for(let i=0; i<childrens.length; i++){
-        //    if(childrens[i].value === old_name){
-        //        if (new_name === '') childrens[i].remove()
-        //        else childrens[i].value = new_name
-        //    }
+        let data_set = document.getElementById("id_localization_list")
+        let childrens = data_set.children
+        for (let i = 0; i < childrens.length; i++) {
+            if (childrens[i].value === old_name) {
+                if (new_name === '') {
+                    console.log(search_idx)
+                    console.log($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val())
+                    if ($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val() == old_name){
+                        $("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val('')
+                    }
+                    childrens[i].remove()
 
-        if (new_name === '') {
-            console.log($("#id_physical_location_list #id_physical_location_list option[value=new_value]"))
-            $("#id_physical_location_list #id_physical_location_list option[value=new_value]").remove();
+                }
+                else {
+                    console.log(search_idx)
+                    console.log($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val())
+                    if ($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val() == old_name){
+                        $("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val(new_name)
+                    }
+                    childrens[i].value = new_name
+                }
+            }
         }
-        else {
-            console.log($("#id_physical_location_list #id_physical_location_list option[value=new_value]"))
-            $("#id_physical_location_list #id_physical_location_list option[value=new_value]").remove();
-            let data_set = $("#id_physical_location_list #id_physical_location_list")
-            data_set.add(new Option("",new_name));
-        }
+    }
+}
 
+
+function check_category_change(search_idx){
+    if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText) {
+        let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
+        let new_name = HANDLE_CATEGORY_WINDOW.document.getElementById("new_shelve_name").innerText
+        if (old_name !== new_name) HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText = ''
+
+        let data_set = document.getElementById("id_category_list")
+        let childrens = data_set.children
+        for (let i = 0; i < childrens.length; i++) {
+            if (childrens[i].value === old_name) {
+                if (new_name === '') {
+                    childrens[i].remove()
+                }
+                else childrens[i].value = new_name
+            }
+        }
     }
 }
 
@@ -46,9 +67,13 @@ function func_shelve_window_close(mode, search_idx) {
                 let option = "<option value='" + data + "' />";
                 elements[j].innerHTML += option;
             }
-            let selected_element = document.getElementById("book_form"+search_idx).elements["id_physical_location"];
+            let selected_element = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-physical_location"];
             selected_element.value = data
-            global_Shelves_name.push(data)
+
+            let list = document.getElementById("id_localization_list")
+            let option = document.createElement('option')
+            option.value = data
+            list.appendChild(option);
         }
         else if (mode === "search"){
             clearInterval(interval_shelves_search)
@@ -58,7 +83,7 @@ function func_shelve_window_close(mode, search_idx) {
                 let new_value = HANDLE_SHELVE_WINDOW.document.getElementById("new_shelve_name").innerText
 
                 if (old_value === new_value)
-                    $("#book_form"+search_idx + " #id_physical_location").val(new_value)
+                    $("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val(new_value)
             }
             elem.innerText = ''
         }
@@ -66,7 +91,9 @@ function func_shelve_window_close(mode, search_idx) {
     }
     else {
         if (mode === "search"){
-            interval_shelves_search = setInterval(check_shelve_change, 1000)
+            interval_shelves_search = setInterval(function(){
+                check_shelve_change(search_idx)
+            }, 1000)
             console.log("dsd")
         }
     }
@@ -77,19 +104,46 @@ function func_category_window_close(mode, search_idx) {
     if(HANDLE_CATEGORY_WINDOW.location.href !== 'about:blank'){
         if (mode === "add") {
             let data = HANDLE_CATEGORY_WINDOW.document.getElementById("id_name").value
-            let form_categories = document.getElementById("book_form"+search_idx).elements["id_categories"];
+            let form_categories = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-categories"];
+
             if(form_categories.value.length > 0)
                 form_categories.value += " , " + data
             else
                 form_categories.value = data
 
-            global_Shelves_name.push(data)
+            let list = document.getElementById("id_category_list")
+            let option = document.createElement('option')
+            option.value = data
+            list.appendChild(option);
         }
-        if (mode === "search"){
+        else if(mode === "search"){
+            clearInterval(interval_category_search)
+            let elem = HANDLE_CATEGORY_WINDOW.document.getElementById("something_change")
+            if (elem){
+                let old_value = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
+                let new_value = HANDLE_CATEGORY_WINDOW.document.getElementById("new_shelve_name").innerText
 
+                if (old_value === new_value){
+                    let form_categories = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-categories"];
+                    if(form_categories.value.length > 0)
+                        form_categories.value += " , " + new_value
+                    else
+                        form_categories.value = new_value
+                }
+                elem.innerText = ''
+            }
+            HANDLE_CATEGORY_WINDOW.close()
         }
-        HANDLE_CATEGORY_WINDOW.close()
     }
+    else {
+        if (mode === "search"){
+            interval_category_search = setInterval(function(){
+                check_category_change(search_idx)
+            }, 1000)
+            console.log("dsd")
+        }
+    }
+
 }
 
 
@@ -109,6 +163,6 @@ function func_add_cat(search_idx){
 }
 
 function func_search_cat(search_idx){
-    HANDLE_CATEGORY_WINDOW = window.open("/search_category", 'search_category', 'height=300,width=400');
+    HANDLE_CATEGORY_WINDOW = window.open("/search_category", 'search_category', 'height=800,width=600');
     HANDLE_CATEGORY_WINDOW.onunload = function (){func_category_window_close("search", search_idx);}
 }

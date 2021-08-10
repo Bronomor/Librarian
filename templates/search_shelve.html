@@ -129,7 +129,6 @@
                         let container = document.getElementById("shelve"+idx)
                         while (container.firstChild) {
                             container.removeChild(container.lastChild);
-                            console.log("asdas")
                         }
                         container.remove()
                     },
@@ -174,17 +173,34 @@
                     paragraph.id = "shelve_name_text" + idx
                     paragraph.innerHTML = name
 
+                    let button_show = document.createElement("button")
+                    button_show.innerHTML = 'Rozwiń'
+                    button_show.className = 'btn btn-light btn-sm'
+                    button_show.style.float = 'right'
+                    button_show.onclick = function (){
+                        if (document.getElementById("shelve" + idx).className === "card-header text-white results_showing_details"){
+                            document.getElementById("shelve" + idx).className = "card-header text-white results_not_showing_details"
+                            this.innerHTML = "Rozwiń";
+                        }
+                        else{
+                            document.getElementById("shelve" + idx).className = "card-header text-white results_showing_details"
+                            this.innerHTML = "Zwiń";
+                        }
+                    }
+
                     container.appendChild(paragraph)
+                    container.appendChild(button_show)
 
                     container.id = "shelve" + idx
-                    container.className = "card-header text-white"
-                    container.style = "background-color: #00AA9E; margin: 5px"
+                    container.className = "card-header text-white results_not_showing_details"
+                    container.style = "background-color: #00AA9E"
                     container.onmouseover = function (event) {
                         this.style = "background-color: #AAAA9E; margin: 5px"
                     }
                     container.onmouseout = function () {
                         this.style = "background-color: #00AA9E; margin: 5px"
                     }
+                    container.style = "background-color: #00AA9E"
                     container.onclick = function () {
                         if (!document.getElementById("shelve_body" + idx)) {
 

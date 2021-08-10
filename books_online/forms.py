@@ -1,6 +1,6 @@
+from crispy_forms.helper import FormHelper
 from django import forms
 import floppyforms
-from rest_framework import serializers
 
 from . import models
 from .models import Book, Shelve, BookCategory
@@ -37,15 +37,13 @@ class BookCategory_form(forms.ModelForm):
 
 class Search_form(forms.Form):
     author = forms.CharField(label='Autor', required=False, max_length=100, widget=floppyforms.widgets.Input(
-        datalist={m['author'] for m in Book.objects.values('author')},
-        attrs={'autocomplete': 'off', "class": "form-control"}))
+       attrs={'autocomplete': 'off', "class": "form-control", "list": "id_author_list"}))
     title = forms.CharField(label='Tytuł', required=False, max_length=100,
                             widget=forms.TextInput(attrs={"class": "form-control", "autocomplete": "off"}))
     ISBN = forms.CharField(label='ISBN', required=False, max_length=13,
                            widget=forms.TextInput(attrs={"class": "form-control", "autocomplete": "off"}))
     publisher = forms.CharField(label='Wydawca', required=False, max_length=100, widget=floppyforms.widgets.Input(
-        datalist={m['publisher'] for m in Book.objects.values('publisher')},
-        attrs={'autocomplete': 'off', "class": "form-control"}))
+        attrs={'autocomplete': 'off', "class": "form-control", "list": "id_publisher_list"}))
     published_city = forms.CharField(label='Miasto wydawcy', required=False, max_length=100,
                                      widget=forms.TextInput(attrs={"class": "form-control", "autocomplete": "off"}))
     published_year = forms.CharField(label='Rok publikacji', required=False, max_length=100,
@@ -54,11 +52,10 @@ class Search_form(forms.Form):
     bought_date2 = forms.DateField(label="Do kiedy", widget=DateInput(attrs={"class": "form-control", "autocomplete": "off"}), required=False)
     localization = forms.CharField(label='Lokalizacja', required=False, max_length=100,
                                    widget=floppyforms.widgets.Input(
-                                       datalist={m['name'] for m in Shelve.objects.values('name')},
-                                       attrs={'autocomplete': 'off', "class": "form-control"}))
+                                       attrs={'autocomplete': 'off', "class": "form-control", "list": "id_localization_list"}))
     category = forms.CharField(label='Kategorie', required=False, max_length=100, widget=floppyforms.widgets.Input(
-        datalist={m['name'] for m in BookCategory.objects.values('name')},
-        attrs={'autocomplete': 'off', "class": "form-control"}))
+
+        attrs={'autocomplete': 'off', "class": "form-control", "list": "id_category_list"}))
 
 
 class Book_form(forms.ModelForm):
@@ -79,25 +76,25 @@ class Book_form(forms.ModelForm):
                   "physical_location": "Półka"
                   }
         widgets = {
-            "author": floppyforms.widgets.Input(datalist={m['author'] for m in Book.objects.values('author')},
-                                                attrs={'autocomplete': 'off', 'class': 'form-control',
-                                                       'required': "True"}),
-            "physical_location": floppyforms.widgets.Input(datalist=[m['name'] for m in Shelve.objects.values('name')],
-                                                           attrs={'autocomplete': 'off', 'class': 'form-control',
-                                                                  'required': "True"}),
-
+            "author": floppyforms.widgets.Input(attrs={'autocomplete': 'off', 'class': 'form-control', 'required': "True", "list": "id_author_list"}),
+            "physical_location": floppyforms.widgets.Input(attrs={'autocomplete': 'off', 'class': 'form-control', 'required': "True", "list": "id_localization_list"}),
             "title": forms.TextInput(attrs={"class": "form-control", "required": "True", "autocomplete": "off"}),
             "ISBN": forms.TextInput(attrs={"class": "form-control", "required": "True", "autocomplete": "off"}),
-            "publisher": floppyforms.widgets.Input(datalist={m['publisher'] for m in Book.objects.values('publisher')},
-                                                   attrs={'autocomplete': 'off', "class": "form-control"}),
+            "publisher": floppyforms.widgets.Input(attrs={'autocomplete': 'off', "class": "form-control", "list": "id_publisher_list"}),
             "published_city": forms.TextInput(attrs={"class": "form-control", "autocomplete": "off"}),
             "published_year": forms.TextInput(attrs={"class": "form-control", "autocomplete": "off"}),
-
             "price": forms.NumberInput(attrs={"class": "form-control", "autocomplete": "off"}),
             "bought_date": forms.DateInput(format='%m-%d-%Y', attrs={"class": "form-control", "autocomplete": "off"}),
             "details": forms.Textarea(attrs={"class": "form-control", "autocomplete": "off"}),
             "categories": forms.Textarea(attrs={"class": "form-control", "autocomplete": "off"}),
         }
+
+        @property
+        def helper(self):
+            helper = FormHelper()
+            helper.form_tag = False
+            helper.disable_csrf = True
+            return helper
 
 
 class Shelve_search_form(forms.ModelForm):

@@ -41,28 +41,83 @@
 
 {% block main_article %}
 
+    <datalist id="id_category_list"></datalist>
+    <datalist id="id_localization_list"></datalist>
+    <datalist id="id_publisher_list"></datalist>
+    <datalist id="id_author_list"></datalist>
+
     <script>
+        let list = document.getElementById("id_author_list");
+        let option;
+        {% for elem in datalist_author %}
+            option = document.createElement('option')
+            option.value = "{{elem}}"
+            list.appendChild(option);
+        {% endfor %}
 
-    let csrfValue = '{{ csrf_token }}';
-    let global_Shelves_name = {{ shelves_name | safe }};
+        list = document.getElementById("id_publisher_list")
+            {% for elem in datalist_publisher %}
+            option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option)
+            {% endfor %}
 
-    function scroll_to_elem(mode){
-        let val1 = parseInt(document.getElementById("slot_text_idx1").innerHTML);
-        let val2 = parseInt(document.getElementById("slot_text_idx2").innerHTML);
+        list = document.getElementById("id_localization_list")
+            {% for elem in datalist_location %}
+                option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option)
+            {% endfor %}
+
+        list = document.getElementById("id_category_list")
+            {% for elem in datalist_category %}
+                option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option)
+            {% endfor %}
+
+    </script>
+
+    <script>
+        let organiser = new Basic_stuff();
+
+        let csrfValue = '{{ csrf_token }}';
+
+        function scroll_to_elem(mode){
+            let val1 = parseInt(document.getElementById("slot_text_idx1").innerHTML);
+            let val2 = parseInt(document.getElementById("slot_text_idx2").innerHTML);
 
 
-        if ((val1 >= val2 && mode==="bottom") || (val1 < 2 && mode==="top")) return
+            if ((val1 >= val2 && mode==="bottom") || (val1 <= 1 && mode==="top") || (val1 < 1 && mode==="top" && val2 < 1)) return
 
-        let slots_number = parseInt(document.getElementById("slot_text_idx1").innerHTML)
+            let slots_number = parseInt(document.getElementById("slot_text_idx1").innerHTML)
 
-        if(mode === "bottom")
-            document.getElementById("slot_text_idx1").innerHTML = slots_number + 1
-        else{
-            document.getElementById("slot_text_idx1").innerHTML = slots_number - 1
-            slots_number -= 2
+            if(mode === "bottom")
+                document.getElementById("slot_text_idx1").innerHTML = slots_number + 1
+            else{
+                document.getElementById("slot_text_idx1").innerHTML = slots_number - 1
+                slots_number -= 2
+            }
+
+            if (organiser.actual_list_node){
+                let node = null;
+                if(mode === "bottom") node = organiser.actual_list_node.next
+                else node = organiser.actual_list_node.prev
+
+                if(node){
+                    document.getElementById('container_book' + node.value).scrollIntoView();
+                    organiser.actual_list_node = node
+                }
+
+            }
+            else {
+                let root = organiser.list.get_root()
+                document.getElementById('container_book' + root.value).scrollIntoView();
+                organiser.actual_list_node = root
+            }
+
+
         }
-        document.getElementById('container_book' + slots_number).scrollIntoView();
-    }
     </script>
 
 {% endblock %}

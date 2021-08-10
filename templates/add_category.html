@@ -21,8 +21,8 @@
             <form action="/add_category" method="post" id="form_category">
                 {% csrf_token %}
                 {% bootstrap_form form %}
+                <button type="button" onclick="submit_form()" class="btn btn-success"> Dodaj kategorię </button>
             </form>
-                <button onclick="submit_form()" class="btn btn-success"> Dodaj kategorię </button>
 
             <script>
                 function submit_form(){

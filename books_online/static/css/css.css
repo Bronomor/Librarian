@@ -26,6 +26,7 @@ header {
     margin: 0;
     padding: 0;
     text-align: center;
+    z-index: 15;
 }
 
 article {
@@ -260,4 +261,22 @@ label {
 
 .search_page_edit_form{
     height: 100px
+}
+
+
+/******************************************************
+
+        Search shelve & Search category- results
+
+*******************************************************/
+
+.results_showing_details{
+    height: 30vh;
+    margin: 5px;
+}
+
+.results_not_showing_details{
+    height: 7vh;
+    overflow: hidden;
+    margin: 5px;
 }

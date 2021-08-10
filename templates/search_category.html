@@ -11,25 +11,246 @@
         <title> Wyszukaj kategorie </title>
     </head>
 
-    <body class="text-center bg-gray" style="overflow: hidden">
+    <body class="text-center bg-gray">
 
-        <header class="bg-gray-dark" style="height: 20vh">
-            <p class="text-center text-white" style="font-size: 40px;"> Dodaj Kategorie </p>
+        <header class="bg-gray-dark" style="height: 8vh">
+            <p class="text-center text-white" style="font-size: 40px;"> Wyszukaj kategorie </p>
         </header>
 
-        <div class="p-3 mb-2 bg-secondary text-white" style="text-align: center; height: 275px; overflow: hidden">
-            <form action="/add_category" method="post" id="form_category">
-                {% csrf_token %}
-                {% bootstrap_form form %}
+        <div class="p-3 mb-2 bg-secondary text-white" style="text-align: center">
+            <form method="POST" id="search_form">
+            {% csrf_token %}
+                    <div class="mb-1 col">
+                        <label for="{{ form____.name.id_for_label }}" class="form-label"> {{ form____.name.label }} </label>
+                        {{ form____.name}}
+                    </div>
+                <br>
             </form>
-                <button onclick="submit_form()" class="btn btn-success"> Dodaj kategorię </button>
 
-            <script>
-                function submit_form(){
-                    document.getElementById("form_category").submit();
-                    window.close()
+            <div class="d-flex justify-content-center">
+                    <button onclick="search_chosen()" class="col-md-3 btn btn-success"> Szukaj </button>
+            </div>
+
+            <br>
+            <div id="something_change" hidden="true" style="width:0; height: 0;"> </div>
+            <div id="old_shelve_name" hidden="true" style="width:0; height: 0;"> </div>
+            <div id="new_shelve_name" hidden="true" style="width:0; height: 0;"> </div>
+
+            <div id="results">
+
+            </div>
+
+        <script>
+
+            function search_chosen(){
+                let form_data = new FormData()
+                    form_data.append('name', document.getElementById("id_name").value)
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                    form_data.append('mode', 'search_chosen')
+
+                $.ajax({
+                    type: 'POST',
+                    url: "/search_category",
+                    data: form_data,
+                    success: function (response) {
+                        let title_elem = document.getElementById("results")
+                        while (title_elem.firstChild) {
+                            title_elem.removeChild(title_elem.lastChild);
+                        }
+                        fill_results("ajax", response)
+                    },
+                    error: function (error) {
+                        console.log(this.error)
+                    },
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                });
+            }
+
+            function change_book_data(idx){
+                let form_data = new FormData()
+                    form_data.append('name', document.getElementById("id_input_name"+idx).value)
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                    form_data.append('id', idx)
+                    form_data.append('mode', 'change_book')
+
+                $.ajax({
+                    type: 'POST',
+                    url: "/search_category",
+                    data: form_data,
+                    success: function (response) {
+                        let title_elem = document.getElementById("shelve_name_text"+idx)
+
+                        console.log(title_elem)
+
+                        document.getElementById("something_change").innerText = 1
+                        document.getElementById("old_shelve_name").innerText = title_elem.innerHTML
+                        document.getElementById("new_shelve_name").innerText = response.changed_name
+
+                        if(title_elem.innerHTML !== response.changed_name){
+                              title_elem.innerHTML =  response.changed_name
+                        }
+                    },
+                    error: function (error) {
+                        console.log(this.error)
+                    },
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                });
+            }
+
+            function delete_book(idx){
+                let form_data = new FormData()
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                    form_data.append('id', idx)
+                    form_data.append('mode', 'delete_book')
+
+                let old_name = document.getElementById("shelve_name_text"+idx).innerText
+
+                $.ajax({
+                    type: 'POST',
+                    url: "/search_category",
+                    data: form_data,
+                    success: function (response) {
+
+                        document.getElementById("something_change").innerText = 1
+                        document.getElementById("old_shelve_name").innerText = old_name
+                        document.getElementById("new_shelve_name").innerText = ''
+
+                        let container = document.getElementById("shelve"+idx)
+                        while (container.firstChild) {
+                            container.removeChild(container.lastChild);
+                        }
+                        container.remove()
+                    },
+                    error: function (error) {
+                        console.log(this.error)
+                    },
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                });
+            }
+
+            function fill_results(mode='', response='') {
+
+                let total_length = '';
+                if(mode === "ajax")
+                    total_length = response['length'];
+                else
+                    total_length = {{names|length}};
+
+                let results_div = document.getElementById("results");
+
+                for (let i = 0; i <total_length; i++) {
+                    let container = document.createElement("div")
+
+                    let idx;
+                    let name;
+                    if(mode === "ajax"){
+                        idx = response['idx'][i];
+                        name = response['names'][i];
+                    }
+                    else{
+                        idx = {{idx|safe}}[i]
+                        name = {{names|safe}}[i]
+                    }
+
+                    let paragraph = document.createElement("p")
+                    paragraph.id = "shelve_name_text" + idx
+                    paragraph.innerHTML = name
+
+                    let button_show = document.createElement("button")
+                    button_show.innerHTML = 'Rozwiń'
+                    button_show.className = 'btn btn-light btn-sm'
+                    button_show.style.float = 'right'
+                    button_show.onclick = function (){
+                        if (document.getElementById("shelve" + idx).className === "card-header text-white results_showing_details"){
+                            document.getElementById("shelve" + idx).className = "card-header text-white results_not_showing_details"
+                            this.innerHTML = "Rozwiń";
+                        }
+                        else{
+                            document.getElementById("shelve" + idx).className = "card-header text-white results_showing_details"
+                            this.innerHTML = "Zwiń";
+                        }
+                    }
+
+                    container.appendChild(paragraph)
+                    container.appendChild(button_show)
+
+                    container.id = "shelve" + idx
+                    container.className = "card-header text-white results_not_showing_details"
+                    container.style = "background-color: #00AA9E"
+                    container.onmouseover = function (event) {
+                        this.style = "background-color: #AAAA9E; margin: 5px"
+                    }
+                    container.onmouseout = function () {
+                        this.style = "background-color: #00AA9E; margin: 5px"
+                    }
+                    container.style = "background-color: #00AA9E"
+                    container.onclick = function () {
+                        if (!document.getElementById("shelve_body" + idx)) {
+
+                            let card_body = document.createElement("div")
+                            card_body.id = "shelve_body" + idx
+                            card_body.className = "card-body"
+
+                            let input_name = document.createElement("input")
+                            input_name.type = "text"
+                            input_name.className = "form-control"
+                            input_name.id = "id_input_name" + idx
+                            input_name.value = name
+
+                            let label1 = document.createElement('label')
+                            label1.htmlFor = "id_input_name" + idx
+                            label1.innerText = "nazwa kategorii"
+                            label1.className = "form-label"
+
+                            let save_button = document.createElement("button")
+                            save_button.className = "btn btn-success"
+                            save_button.innerHTML = "Zapisz zmiany"
+                            save_button.type = "button"
+                            save_button.onclick = function () {
+                                change_book_data(idx)
+                            }
+
+                            let take_button = document.createElement("button")
+                            take_button.className = "btn btn-success"
+                            take_button.innerHTML = "Wybierz kategorie"
+                            take_button.type = "button"
+                            take_button.onclick = function () {
+                                document.getElementById("something_change").innerText = 1
+                                let value = document.getElementById("shelve_name_text" + idx).innerText
+                                document.getElementById("old_shelve_name").innerText = value
+                                document.getElementById("new_shelve_name").innerText = value
+                                window.close()
+                            }
+
+                            let delete_button = document.createElement("button")
+                            delete_button.className = "btn btn-danger"
+                            delete_button.innerHTML = "Usuń"
+                            delete_button.type = "button"
+                            delete_button.onclick = function () {
+                                delete_book(idx)
+                            }
+
+                            card_body.appendChild(label1)
+                            card_body.appendChild(input_name)
+                            card_body.appendChild(document.createElement("br"))
+                            card_body.appendChild(take_button)
+                            card_body.appendChild(save_button)
+                            card_body.appendChild(delete_button)
+                            this.appendChild(card_body)
+                        }
+                    }
+                    results_div.appendChild(container)
                 }
-            </script>
-        </div>
+            }
+
+        </script>
+    </div>
+
     </body>
 </html>
