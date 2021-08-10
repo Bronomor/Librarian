@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {% load static %}
+        {% load bootstrap5 %}
+
+        <link rel="stylesheet" href="{% static 'css/css.css' %}">
+        <script src="{% static 'js/jquery-3.6.0.min.js' %}"></script>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+        <title> Dodaj Kategorie </title>
+    </head>
+
+    <body class="text-center bg-gray" style="overflow: hidden">
+
+        <header class="bg-gray-dark" style="height: 20vh">
+            <p class="text-center text-white" style="font-size: 40px;"> Dodaj Kategorie </p>
+        </header>
+
+        <div class="p-3 mb-2 bg-secondary text-white" style="text-align: center; height: 275px; overflow: hidden">
+            <form action="/add_category" method="post" id="form_category">
+                {% csrf_token %}
+                {% bootstrap_form form %}
+            </form>
+                <button onclick="submit_form()" class="btn btn-success"> Dodaj kategorię </button>
+
+            <script>
+                function submit_form(){
+                    document.getElementById("form_category").submit();
+                    window.close()
+                }
+            </script>
+        </div>
+    </body>
+</html>

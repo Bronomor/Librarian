@@ -1,0 +1,276 @@
+{% extends 'main_site.html' %}
+{% load static %}
+{% load bootstrap5 %}
+
+
+{% block title %}
+    <title> Szukaj książki </title>
+{% endblock %}
+
+{% block links_header %}
+    <link rel="stylesheet" href="{% static 'js/bootstrap-datepicker.css' %}">
+    <script type="text/javascript" src="{% static 'js/bootstrap-datepicker.js' %}"> </script>
+    <script type="text/javascript" src="{% static 'js/external_window_handlers.js' %}"> </script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+{% endblock %}
+
+{% block main_header %}
+    <p style="font-size: 40px;"> Wyszukaj książki </p>
+{% endblock %}
+
+{% block main_article %}
+
+    <script type="text/javascript">
+        window.onload = load;
+        function load() {
+            document.getElementById("{{ form.author.id_for_label }}").value = "{{ author }}"
+            document.getElementById("{{ form.title.id_for_label }}").value = "{{ title }}"
+            document.getElementById("{{ form.ISBN.id_for_label }}").value = "{{ ISBN }}"
+            document.getElementById("{{ form.publisher.id_for_label }}").value = "{{ publisher }}"
+            document.getElementById("{{ form.published_city.id_for_label }}").value = "{{ published_city }}"
+            document.getElementById("{{ form.published_year.id_for_label }}").value = "{{ published_year }}"
+
+            let date = new Date("{{ bought_date_1 }}")
+            let currentDate = date.toISOString().substring(0,10);
+            document.getElementById("{{ form.bought_date1.id_for_label }}").value   = currentDate
+
+            date = new Date("{{ bought_date_2 }}")
+            currentDate = date.toISOString().substring(0,10);
+            document.getElementById("{{ form.bought_date2.id_for_label }}").value   = currentDate
+
+            document.getElementById("{{ form.category.id_for_label }}").value = "{{ category }}"
+            document.getElementById("{{ form.localization.id_for_label }}").value = "{{ localization }}"
+        }
+    </script>
+
+    <div class="p-3 mb-3 bg-gray-dark text-white">
+        <form method="POST" id="search_form">
+        {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="{{ form.author.id_for_label }}" class="form-label"> {{ form.author.label }} </label>
+                    {{form.author}}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="{{ form.title.id_for_label }}" class="form-label"> {{ form.title.label }} </label>
+                    {{ form.title }}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="{{ form.ISBN.id_for_label }}" class="form-label"> {{ form.ISBN.label }} </label>
+                    {{form.ISBN}}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="{{ form.publisher.id_for_label }}" class="form-label"> {{ form.publisher.label }} </label>
+                    {{ form.publisher }}
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="{{ form.published_city.id_for_label }}" class="form-label"> {{ form.published_city.label }} </label>
+                    {{form.published_city}}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="{{ form.published_year.id_for_label }}" class="form-label"> {{ form.published_year.label }} </label>
+                    {{ form.published_year }}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="{{ form.bought_date1.id_for_label }}" class="form-label"> {{ form.bought_date1.label }} </label>
+                    {{form.bought_date1}}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="{{ form.bought_date2.id_for_label }}" class="form-label"> {{ form.bought_date2.label }} </label>
+                    {{ form.bought_date2 }}
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <label for="{{ form.category.id_for_label }}" class="form-label"> {{ form.category.label }} </label>
+                    {{form.category}}
+                </div>
+
+                <div class="col">
+                    <label for="{{ form.localization.id_for_label }}" class="form-label"> {{ form.localization.label }} </label>
+                    {{ form.localization }}
+                </div>
+            </div>
+
+            <br>
+
+            <div class="d-flex justify-content-center">
+                <input type="submit" value="Szukaj" class="col-md-3 btn btn-success">
+                <input type="reset" value="Wyczyść" class="col-md-3 btn btn-danger">
+            </div>
+        </form>
+    </div>
+
+    <div id="results">
+        <script>
+            function change_book_data(idx){
+                let form_data = new FormData(document.getElementById("book_container"+idx))
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                    form_data.append('id', idx)
+                    form_data.append('mode', 'change_book')
+
+                $.ajax({
+                    type: 'POST',
+                    url: "/search_books",
+                    data: form_data,
+                    success: function (response) {
+                        let title_elem = document.getElementById("book_text"+idx)
+                        if(title_elem.innerHTML !== response.changed_title){
+                              title_elem.innerHTML =  "id: " + idx + " , " + response.changed_title
+                        }
+                    },
+                    error: function (error) {
+                        console.log(this.error)
+                    },
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                });
+            }
+
+            function delete_book(idx){
+                let form_data = new FormData()
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                    form_data.append('id', idx)
+                    form_data.append('mode', 'delete_book')
+
+                $.ajax({
+                    type: 'POST',
+                    url: "/search_books",
+                    data: form_data,
+                    success: function (response) {
+                        let container = document.getElementById("book"+idx)
+                        while (container.firstChild) {
+                            container.removeChild(container.lastChild);
+                            console.log("asdas")
+                        }
+                        container.remove()
+                    },
+                    error: function (error) {
+                        console.log(this.error)
+                    },
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                });
+            }
+
+            function show_book_details(idx){
+                let book_container = document.getElementById("book_container"+idx)
+                if (!book_container){
+
+                    document.getElementById("book_show"+idx).innerText = "up"
+
+                    let form_data = new FormData()
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                    form_data.append('id', idx)
+                    form_data.append('mode', 'search_book')
+
+                    $.ajax({
+                        type: 'POST',
+                        url: "/search_books",
+                        data: form_data,
+                        success: function (response) {
+                            if (!document.getElementById("book_container" + idx)) {
+                                document.getElementById("book" + idx).className = "results_block_clicked"
+                                form_ = document.createElement("form")
+                                form_.id = "book_container" + idx
+                                form_.className = "search_page_edit_form"
+                                document.getElementById("book" + idx).appendChild(form_)
+
+                                form_.insertAdjacentHTML('afterbegin', response.book_form)
+
+                                $(function () {
+                                    $('#book_container' + idx + ' #id_bought_date').datepicker({
+                                        'format': 'dd-mm-yyyy',
+                                        'autoclose': true
+                                    });
+                                });
+
+                                save_button = document.createElement("button")
+                                save_button.className = "btn btn-success"
+                                save_button.innerHTML = "Zapisz zmiany"
+                                save_button.type="button"
+                                save_button.onclick = function () {
+                                    change_book_data(idx)
+                                }
+                                delete_button = document.createElement("button")
+                                delete_button.className = "btn btn-danger"
+                                delete_button.innerHTML = "Usuń"
+                                delete_button.type="button"
+                                delete_button.onclick = function () {
+                                    delete_book(idx)
+                                }
+
+                                form_.appendChild(save_button)
+                                form_.appendChild(delete_button)
+                                form_.appendChild(delete_button)
+                            }
+                        },
+                        error: function (error) {
+                            console.log(this.error)
+                        },
+                        cache: false,
+                        contentType: false,
+                        processData: false,
+                    });
+                }
+            }
+
+            let global_div = document.getElementById("results")
+            for (let i = 0; i < {{results|length}}; i++){
+                let idx = {{results2|safe}}[i]
+
+                let row = document.createElement("div")
+                row.className="row"
+
+                let col = document.createElement("div")
+                col.className="col"
+
+                let div = document.createElement("div");
+                div.id = "book" + idx
+                div.className = "results_block"
+                div.onclick = function (){
+                    show_book_details(idx)
+                }
+
+                let paragraph = document.createElement("p");
+                paragraph.id = "book_text" + idx
+                paragraph.innerText  = "id: " + idx + " , " + {{results|safe}}[i]
+
+
+                let show_button = document.createElement("div");
+                show_button.id = "book_show" + idx
+                show_button.className = "btn btn-light btn-sm"
+                show_button.innerText  = "down"
+                show_button.onclick = function (){
+                    let book_case = document.getElementById("book"+idx)
+                    if (book_case.className === "results_block_clicked"){
+                        document.getElementById("book_container"+idx).hidden = true
+                        book_case.className = "results_block"
+                        this.innerText = "down"
+                    }
+                    else if(document.getElementById("book_container"+idx)){
+                        document.getElementById("book_container"+idx).hidden = false
+                        book_case.className = "results_block_clicked"
+                        this.innerText = "up"
+                    }
+                }
+                div.appendChild(paragraph)
+                div.appendChild(show_button)
+                global_div.appendChild(div)
+            }
+        </script>
+    </div>
+
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'main_site.html' %}
+{% load static %}
+
+{% block title %}
+    <title> Dodaj książke </title>
+{% endblock %}
+
+{% block links_header %}
+    <script src="{% static 'js/add_book.js' %}"></script>
+    <script src="{% static 'js/timer.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/external_window_handlers.js' %}"> </script>
+    <link rel="stylesheet" href="{% static 'js/bootstrap-datepicker.css' %}">
+    <script type="text/javascript" src="{% static 'js/bootstrap-datepicker.js' %}"> </script>
+{% endblock %}
+
+{% block main_header %}
+    <script>
+        document.getElementById("main_header").style="position: sticky; top: 0;";
+    </script>
+
+    <div style="text-align: center; padding: 12px">
+
+        <button onclick="add_book_slot()" class="btn btn-info">
+            Dodaj nowy slot na dodawaną książkę
+        </button>
+
+        <button onclick="scroll_to_elem('bottom')" class="btn btn-info">
+            Przejść dalej
+        </button>
+
+        <p> Slot </p> <p id="slot_text_idx1"> 0 </p> <p> z </p> <p id="slot_text_idx2">  0 </p>
+
+        <button onclick="scroll_to_elem('top')" class="btn btn-info">
+            Powrócić
+        </button>
+
+    </div>
+
+
+{% endblock %}
+
+{% block main_article %}
+
+    <script>
+
+    let csrfValue = '{{ csrf_token }}';
+    let global_Shelves_name = {{ shelves_name | safe }};
+
+    function scroll_to_elem(mode){
+        let val1 = parseInt(document.getElementById("slot_text_idx1").innerHTML);
+        let val2 = parseInt(document.getElementById("slot_text_idx2").innerHTML);
+
+
+        if ((val1 >= val2 && mode==="bottom") || (val1 < 2 && mode==="top")) return
+
+        let slots_number = parseInt(document.getElementById("slot_text_idx1").innerHTML)
+
+        if(mode === "bottom")
+            document.getElementById("slot_text_idx1").innerHTML = slots_number + 1
+        else{
+            document.getElementById("slot_text_idx1").innerHTML = slots_number - 1
+            slots_number -= 2
+        }
+        document.getElementById('container_book' + slots_number).scrollIntoView();
+    }
+    </script>
+
+{% endblock %}

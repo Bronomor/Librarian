@@ -1,0 +1,46 @@
+{% extends 'main_site.html' %}
+{% load static %}
+{% load bootstrap5 %}
+
+{% block title %}
+    <title> Szukaj książki </title>
+{% endblock %}
+
+{% block links_header %}
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+{% endblock %}
+
+{% block main_header %}
+    <p style="font-size: 40px;"> Wczytaj kopie zapasową </p>
+{% endblock %}
+
+{% block main_article %}
+
+    <form enctype="multipart/form-data" method="POST" style="overflow: hidden" class="bg-gray-dark text-center">
+        {% csrf_token %}
+        <br>
+         <div class="form-group row " >
+            <label for="shelve_slot" class="col form-label"> Dodaj plik z półkami </label>
+             <div class="col">
+                <input type="file" class="form-control-file" id="shelve_slot" name="shelve_input" required>
+             </div>
+        </div>
+
+         <div class="form-group row" >
+            <label for="bookcategory_slot" class="col form-label"> Dodaj plik z kategoriami </label>
+             <div class="col">
+                <input type="file" class="form-control-file" id="bookcategory_slot" name="bookcategory_input"  required>
+             </div>
+        </div>
+
+        <div class="form-group row" >
+            <label for="book_slot" class="col form-label"> Dodaj plik z książkami </label>
+            <div class="col">
+                <input type="file" class="form-control-file" id="book_slot" name="book_input" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-info"> Rozpocznij kopie zapasową </button>
+    </form>
+
+{% endblock %}
