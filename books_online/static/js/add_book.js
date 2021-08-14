@@ -165,7 +165,16 @@ function add_book(search_idx){
         url: $(form_name).attr("action"),
         data: form_data,
         success: function(response) {
-            console.log(response)
+            if(response.success){
+                console.log("nie ma błedów")
+            }
+            let parser = new DOMParser();
+            let parsed_form = parser.parseFromString(response.string_form, 'text/html').body.innerHTML
+
+            let form = document.getElementById("book_form"+search_idx)
+            while (form.firstChild)
+                    form.removeChild(form.firstChild);
+            form.insertAdjacentHTML('afterbegin',parsed_form)
         },
         error: function (error){
             console.log(this.error)
@@ -199,8 +208,8 @@ function temporary_book_pass_data(search_idx, data){
     button_add_book.id = "book_button_add"+search_idx
     button_add_book.className = "btn btn-info"
 
-    form.appendChild(button_add_book)
     div.appendChild(form)
+    div.appendChild(button_add_book)
 }
 
 
@@ -216,7 +225,7 @@ function wait_for_search_result(search_idx){
         data: form_data,
         success: function(response) {
             if(!response["status"]){
-                document.getElementById("numb"+search_idx).innerText += 10
+                //document.getElementById("numb"+search_idx).innerText += 10
             }
             else{
                 clearInterval(organiser.book_slot_timer_progress[search_idx])

@@ -16,7 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from books_online.views import add_book_view, main_site, add_shelves, add_category, search_books_view, search_shelves_view, search_category_view, \
-create_backup_view, load_backup_view
+create_backup_view, load_backup_view, statistic_view
 
 
 urlpatterns = [
@@ -30,9 +30,9 @@ urlpatterns = [
     path('search_shelve', search_shelves_view),
     path('search_category', search_category_view),
 
-    path('modify_shelve', main_site),
-    path('modify_category', main_site),
-
     path('create_backup_view', create_backup_view),
     path('load_backup_view', load_backup_view),
+
+    path('statistic_view', statistic_view),
+
 ]

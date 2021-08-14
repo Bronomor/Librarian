@@ -56,7 +56,7 @@ p{
 .container_book_class{
     place-self: center;
     width: 95%;
-    height: 88vh;
+    height: 90vh;
     background-color: #999999;
     padding: 15px;
     margin: 1vh auto;
@@ -271,7 +271,7 @@ label {
 *******************************************************/
 
 .results_showing_details{
-    height: 30vh;
+    height: 33vh;
     margin: 5px;
 }
 
@@ -279,4 +279,38 @@ label {
     height: 7vh;
     overflow: hidden;
     margin: 5px;
+}
+
+
+
+/********************************************************
+
+    Validation - operation success and failure
+
+ *******************************************************/
+
+.failure_div, .failure_div:hover{
+    text-align: center;
+    font-size: 40px;
+    background-color: #8B0000;
+    width: 95%;
+    height: 700px;
+    z-index: 100;
+    color: white;
+    padding: 15px;
+    margin: 1vh auto;
+}
+
+
+.success_div, .success_div:hover{
+    position: relative;
+    padding: 15px;
+    margin: 1vh auto;
+    text-align: center;
+    font-size: 40px;
+    background-color: #228B22;
+    width: 95%;
+    height: 700px;
+    z-index: 100;
+    color: white;
 }

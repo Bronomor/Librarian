@@ -5,7 +5,7 @@ let interval_category_search;
 
 
 function check_shelve_change(search_idx){
-    if(HANDLE_SHELVE_WINDOW.document.getElementById("something_change").innerText) {
+    if(HANDLE_SHELVE_WINDOW.document.getElementById("something_change").innerText.length > 0) {
         let old_name = HANDLE_SHELVE_WINDOW.document.getElementById("old_shelve_name").innerText
         let new_name = HANDLE_SHELVE_WINDOW.document.getElementById("new_shelve_name").innerText
         if (old_name !== new_name) HANDLE_SHELVE_WINDOW.document.getElementById("something_change").innerText = ''
@@ -15,8 +15,6 @@ function check_shelve_change(search_idx){
         for (let i = 0; i < childrens.length; i++) {
             if (childrens[i].value === old_name) {
                 if (new_name === '') {
-                    console.log(search_idx)
-                    console.log($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val())
                     if ($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val() == old_name){
                         $("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val('')
                     }
@@ -24,8 +22,6 @@ function check_shelve_change(search_idx){
 
                 }
                 else {
-                    console.log(search_idx)
-                    console.log($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val())
                     if ($("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val() == old_name){
                         $("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val(new_name)
                     }
@@ -38,7 +34,7 @@ function check_shelve_change(search_idx){
 
 
 function check_category_change(search_idx){
-    if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText) {
+    if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText === "1") {
         let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
         let new_name = HANDLE_CATEGORY_WINDOW.document.getElementById("new_shelve_name").innerText
         if (old_name !== new_name) HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText = ''
@@ -54,6 +50,35 @@ function check_category_change(search_idx){
             }
         }
     }
+    else if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText === "4"){
+        let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
+
+        let categories_elem = document.getElementById("id_prefix"+search_idx+"-categories")
+        if(categories_elem.innerHTML.length)
+            categories_elem.innerHTML +=  " , " + old_name
+        else
+            categories_elem.innerHTML = old_name
+    }
+    else if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText === "3"){
+        let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
+        let text_content = document.getElementById("id_prefix"+search_idx+"-categories")
+
+        let text_content_string = text_content.innerHTML
+        let word_idx = text_content_string.search(old_name)
+
+        let from_comma = word_idx;
+        while(!(text_content_string[from_comma] === ',' || text_content_string[from_comma] === '.') && from_comma > 0)
+            from_comma -= 1
+
+        let to_comma = word_idx;
+        let text_length = text_content_string.length
+
+        while(!(text_content_string[to_comma] === ',' || text_content_string[to_comma] === '.') && to_comma < text_length)
+            to_comma += 1
+
+        text_content.innerHTML = text_content_string.replace(text_content_string.substr(from_comma, to_comma-from_comma), ' ')
+    }
+    HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText = ""
 }
 
 
@@ -61,28 +86,30 @@ function func_shelve_window_close(mode, search_idx) {
     if(HANDLE_SHELVE_WINDOW.location.href !== 'about:blank'){
         if (mode === "add"){
             let data = HANDLE_SHELVE_WINDOW.document.getElementById("id_name").value
-            let elements = document.getElementsByName("id_physical_location_list")
+            if(data) {
+                let elements = document.getElementsByName("id_physical_location_list")
 
-            for (let j = 0; j < elements.length; j++) {
-                let option = "<option value='" + data + "' />";
-                elements[j].innerHTML += option;
+                for (let j = 0; j < elements.length; j++) {
+                    let option = "<option value='" + data + "' />";
+                    elements[j].innerHTML += option;
+                }
+                let selected_element = document.getElementById("book_form" + search_idx).elements["id_prefix" + search_idx + "-physical_location"];
+                selected_element.value = data
+
+                let list = document.getElementById("id_localization_list")
+                let option = document.createElement('option')
+                option.value = data
+                list.appendChild(option);
             }
-            let selected_element = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-physical_location"];
-            selected_element.value = data
-
-            let list = document.getElementById("id_localization_list")
-            let option = document.createElement('option')
-            option.value = data
-            list.appendChild(option);
         }
         else if (mode === "search"){
             clearInterval(interval_shelves_search)
             let elem = HANDLE_SHELVE_WINDOW.document.getElementById("something_change")
-            if (elem){
+            if (elem.innerText.length){
                 let old_value = HANDLE_SHELVE_WINDOW.document.getElementById("old_shelve_name").innerText
                 let new_value = HANDLE_SHELVE_WINDOW.document.getElementById("new_shelve_name").innerText
 
-                if (old_value === new_value)
+                if (old_value === new_value && new_value)
                     $("#book_form"+search_idx + " #id_prefix" + search_idx + "-physical_location").val(new_value)
             }
             elem.innerText = ''
@@ -104,24 +131,27 @@ function func_category_window_close(mode, search_idx) {
     if(HANDLE_CATEGORY_WINDOW.location.href !== 'about:blank'){
         if (mode === "add") {
             let data = HANDLE_CATEGORY_WINDOW.document.getElementById("id_name").value
-            let form_categories = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-categories"];
+            if(data) {
+                let form_categories = document.getElementById("book_form" + search_idx).elements["id_prefix" + search_idx + "-categories"];
 
-            if(form_categories.value.length > 0)
-                form_categories.value += " , " + data
-            else
-                form_categories.value = data
+                if (form_categories.value.length > 0)
+                    form_categories.value += " , " + data
+                else
+                    form_categories.value = data
 
-            let list = document.getElementById("id_category_list")
-            let option = document.createElement('option')
-            option.value = data
-            list.appendChild(option);
+                let list = document.getElementById("id_category_list")
+                let option = document.createElement('option')
+                option.value = data
+                list.appendChild(option);
+            }
         }
         else if(mode === "search"){
             clearInterval(interval_category_search)
             let elem = HANDLE_CATEGORY_WINDOW.document.getElementById("something_change")
-            if (elem){
+            if (elem.innerText == "1"){
                 let old_value = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
                 let new_value = HANDLE_CATEGORY_WINDOW.document.getElementById("new_shelve_name").innerText
+
 
                 if (old_value === new_value){
                     let form_categories = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-categories"];
@@ -132,8 +162,8 @@ function func_category_window_close(mode, search_idx) {
                 }
                 elem.innerText = ''
             }
-            HANDLE_CATEGORY_WINDOW.close()
         }
+        HANDLE_CATEGORY_WINDOW.close()
     }
     else {
         if (mode === "search"){

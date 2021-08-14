@@ -73,7 +73,7 @@ class Book_form(forms.ModelForm):
                   "bought_date": "Data zakupu",
                   "details": "Opis",
                   "categories": "Kategorie",
-                  "physical_location": "Półka"
+                  "physical_location": "Półka",
                   }
         widgets = {
             "author": floppyforms.widgets.Input(attrs={'autocomplete': 'off', 'class': 'form-control', 'required': "True", "list": "id_author_list"}),
@@ -100,22 +100,41 @@ class Book_form(forms.ModelForm):
 class Shelve_search_form(forms.ModelForm):
     class Meta:
         model = models.Shelve
-        fields = ("name", "details")
+        fields = ("name", "details",)
         labels = {"name": "nazwa",
-                  "details": "Opis"}
+                  "details": "Opis", }
         widgets = {
-            "details": forms.Textarea(attrs={"class": "form-control", 'rows': 1, "autocomplete": "off"}),
             "name": floppyforms.widgets.Input(datalist={m['name'] for m in Shelve.objects.values('name')},
                                               attrs={'autocomplete': 'off', 'class': 'form-control',
                                                      'required': "True"}),
+            "details": forms.Textarea(attrs={"class": "form-control", 'rows': 1, "autocomplete": "off"}),
         }
+
+
+class Shelve_change_form(forms.ModelForm):
+    class Meta:
+        model = models.Shelve
+        fields = ("name", "details")
+        labels = {"name": "nazwa półki",
+                  "details": "Opis półki"}
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "autocomplete": "off", "required": True}),
+            "details": forms.Textarea(attrs={"class": "form-control", 'rows': 2, "autocomplete": "off"}),
+        }
+
+        @property
+        def helper(self):
+            helper = FormHelper()
+            helper.form_tag = False
+            helper.disable_csrf = True
+            return helper
 
 
 class Book_category_search_form(forms.ModelForm):
     class Meta:
         model = models.BookCategory
         fields = ("name",)
-        labels = {"name": "nazwa", }
+        labels = {"name": "Nazwa", }
         widgets = {
             "name": floppyforms.widgets.Input(datalist={m['name'] for m in BookCategory.objects.values('name')},
                                               attrs={'autocomplete': 'off', 'class': 'form-control',
@@ -123,3 +142,11 @@ class Book_category_search_form(forms.ModelForm):
         }
 
 
+class Book_category_change_form(forms.ModelForm):
+    class Meta:
+        model = models.BookCategory
+        fields = ("name",)
+        labels = {"name": "Nazwa", }
+        widgets = {
+            "name":    forms.TextInput(attrs={"class": "form-control", "autocomplete": "off", "required": True}),
+        }

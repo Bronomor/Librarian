@@ -1,3 +1,5 @@
+<!-- 1 dodawanie, 2 Zapisz zmiany, 3 usuwanie 4 wybieranie-->
+
 <!DOCTYPE html>
 <html>
     <head>
@@ -32,9 +34,9 @@
             </div>
 
             <br>
-            <div id="something_change" hidden="true" style="width:0; height: 0;"> </div>
-            <div id="old_shelve_name" hidden="true" style="width:0; height: 0;"> </div>
-            <div id="new_shelve_name" hidden="true" style="width:0; height: 0;"> </div>
+            <div id="something_change" hidden="true" style="width:0; height: 0;"></div>
+            <div id="old_shelve_name" hidden="true" style="width:0; height: 0;"></div>
+            <div id="new_shelve_name" hidden="true" style="width:0; height: 0;"></div>
 
             <div id="results">
 
@@ -69,8 +71,17 @@
             }
 
             function change_book_data(idx){
+
+                let form_elem_name = document.getElementById("id_input_name"+idx)
+
+                if(!form_elem_name.value){
+                    form_elem_name.className = "form-control is-invalid"
+                    document.getElementById("form_error"+idx).innerHTML = "Nazwa nie może być pusta lub nazwa jest za długa"
+                    return;
+                }
+
                 let form_data = new FormData()
-                    form_data.append('name', document.getElementById("id_input_name"+idx).value)
+                    form_data.append('name', form_elem_name.value)
                     form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
                     form_data.append('id', idx)
                     form_data.append('mode', 'change_book')
@@ -82,14 +93,18 @@
                     success: function (response) {
                         let title_elem = document.getElementById("shelve_name_text"+idx)
 
-                        console.log(title_elem)
+                        if (response.changed_name){
+                            console.log(title_elem)
 
-                        document.getElementById("something_change").innerText = 1
-                        document.getElementById("old_shelve_name").innerText = title_elem.innerHTML
-                        document.getElementById("new_shelve_name").innerText = response.changed_name
+                            document.getElementById("something_change").innerText = 2
+                            document.getElementById("old_shelve_name").innerText = title_elem.innerHTML
+                            document.getElementById("new_shelve_name").innerText = response.changed_name
 
-                        if(title_elem.innerHTML !== response.changed_name){
-                              title_elem.innerHTML =  response.changed_name
+                            if(title_elem.innerHTML !== response.changed_name){
+                                title_elem.innerHTML =  response.changed_name
+                            }
+                            document.getElementById("form_error"+idx).innerHTML = ''
+                            form_elem_name.className = "form-control is-valid"
                         }
                     },
                     error: function (error) {
@@ -114,16 +129,22 @@
                     url: "/search_category",
                     data: form_data,
                     success: function (response) {
+                        if (response.success) {
+                            document.getElementById("something_change").innerText = 3
+                            document.getElementById("old_shelve_name").innerText = old_name
+                            document.getElementById("new_shelve_name").innerText = ''
 
-                        document.getElementById("something_change").innerText = 1
-                        document.getElementById("old_shelve_name").innerText = old_name
-                        document.getElementById("new_shelve_name").innerText = ''
-
-                        let container = document.getElementById("shelve"+idx)
-                        while (container.firstChild) {
-                            container.removeChild(container.lastChild);
+                            let container = document.getElementById("shelve" + idx)
+                            while (container.firstChild) {
+                                container.removeChild(container.lastChild);
+                            }
+                            container.remove()
                         }
-                        container.remove()
+                        else{
+                            let form_elem_name = document.getElementById("id_input_name"+idx)
+                            form_elem_name.className = "form-control is-invalid"
+                            document.getElementById("form_error"+idx).innerHTML = "Słowo kluczowe nie może być usunięte, poniważ co najmniej jedna książka ma je przypisane"
+                        }
                     },
                     error: function (error) {
                         console.log(this.error)
@@ -208,6 +229,11 @@
                             label1.innerText = "nazwa kategorii"
                             label1.className = "form-label"
 
+                            let error_div = document.createElement('div')
+                            error_div.id = 'form_error' + idx
+                            error_div.className = 'form-text'
+                            error_div.style = 'color: #8B0000;'
+
                             let save_button = document.createElement("button")
                             save_button.className = "btn btn-success"
                             save_button.innerHTML = "Zapisz zmiany"
@@ -221,11 +247,10 @@
                             take_button.innerHTML = "Wybierz kategorie"
                             take_button.type = "button"
                             take_button.onclick = function () {
-                                document.getElementById("something_change").innerText = 1
+                                document.getElementById("something_change").innerText = 4
                                 let value = document.getElementById("shelve_name_text" + idx).innerText
                                 document.getElementById("old_shelve_name").innerText = value
                                 document.getElementById("new_shelve_name").innerText = value
-                                window.close()
                             }
 
                             let delete_button = document.createElement("button")
@@ -238,6 +263,7 @@
 
                             card_body.appendChild(label1)
                             card_body.appendChild(input_name)
+                            card_body.appendChild(error_div)
                             card_body.appendChild(document.createElement("br"))
                             card_body.appendChild(take_button)
                             card_body.appendChild(save_button)

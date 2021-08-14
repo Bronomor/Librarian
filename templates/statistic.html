@@ -1,0 +1,42 @@
+{% extends 'main_site.html' %}
+{% load static %}
+{% load bootstrap5 %}
+
+
+{% block title %}
+    <title> Podsumowanie </title>
+{% endblock %}
+
+{% block links_header %}
+    <link rel="stylesheet" href="{% static 'js/bootstrap-datepicker.css' %}">
+    <script type="text/javascript" src="{% static 'js/bootstrap-datepicker.js' %}"> </script>
+    <script type="text/javascript" src="{% static 'js/external_window_handlers.js' %}"> </script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+{% endblock %}
+
+{% block main_header %}
+    <p style="font-size: 40px; padding-left:15vh"> Podsumowanie </p>
+    <button onclick="location.href ='http://127.0.0.1:8000/'" class="btn btn-info" style="float: right; margin: 10px"> Menu </button>
+{% endblock %}
+
+{% block main_article %}
+
+    <div class="bg-gray-dark text-white" style="width: 100%">
+        <form method="post">
+            {% csrf_token %}
+            <p> Dane posortowane po ISBN  </p>
+            <label for="id_page" class="form-label"> Wybierz strone </label>
+            <input type="number" class=form-control" id="id_page" name="page" value="{{ page }}" required> <p>  z {{ all_pages }} </p>
+            <input type="submit" value="Wybierz">
+        </form>
+    </div>
+
+    {% for key, value in results.items %}
+        <div class = "card-header" style = "color: black; white-space: pre; padding: 0;">
+            Liczba książek {{ value.the_count }}
+            ISBN {{ value.ISBN }}
+            autor: {{ value.author }},
+            tytuł: {{ value.title }}
+        </div>
+    {% endfor %}
+{% endblock %}

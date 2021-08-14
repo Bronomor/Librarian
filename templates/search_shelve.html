@@ -77,11 +77,9 @@
             }
 
             function change_book_data(idx){
-                let form_data = new FormData()
-                    form_data.append('name', document.getElementById("id_input_name"+idx).value)
-                    form_data.append('details', document.getElementById("id_input_details"+idx).value)
-                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
+                let form_data = new FormData(document.getElementById("shelve_form"+idx))
                     form_data.append('id', idx)
+                    form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
                     form_data.append('mode', 'change_book')
 
                 $.ajax({
@@ -89,15 +87,26 @@
                     url: "/search_shelve",
                     data: form_data,
                     success: function (response) {
-                        let title_elem = document.getElementById("shelve_name_text"+idx)
 
-                        document.getElementById("something_change").innerText = 1
-                        document.getElementById("old_shelve_name").innerText = title_elem.innerHTML
-                        document.getElementById("new_shelve_name").innerText = response.changed_name
+                        if(response.success){
+                            let title_elem = document.getElementById("shelve_name_text"+idx)
 
-                        if(title_elem.innerHTML !== response.changed_name){
-                              title_elem.innerHTML =  response.changed_name
+                            document.getElementById("something_change").innerText = 1
+                            document.getElementById("old_shelve_name").innerText = title_elem.innerHTML
+                            document.getElementById("new_shelve_name").innerText = response.changed_name
+
+                            if(title_elem.innerHTML !== response.changed_name){
+                                title_elem.innerHTML =  response.changed_name
+                            }
                         }
+
+                        let parser = new DOMParser();
+                        let parsed_form = parser.parseFromString(response.form_html, 'text/html').body.innerHTML
+
+                        let form = document.getElementById("shelve_form"+idx)
+                        while (form.firstChild)
+                            form.removeChild(form.firstChild);
+                        form.insertAdjacentHTML('afterbegin',parsed_form)
                     },
                     error: function (error) {
                         console.log(this.error)
@@ -168,6 +177,8 @@
                         details = {{details|safe}}[i]
                     }
 
+                    let shelve_form = document.createElement("form")
+                    shelve_form.id = "shelve_form" + idx
 
                     let paragraph = document.createElement("p")
                     paragraph.id = "shelve_name_text" + idx
@@ -211,23 +222,28 @@
                             let input_name = document.createElement("input")
                             input_name.type = "text"
                             input_name.className = "form-control"
-                            input_name.id = "id_input_name" + idx
+                            input_name.id = "id_prefix" + idx + "-name"
+                            input_name.name = "prefix" + idx + "-name"
                             input_name.value = name
 
                             let label1 = document.createElement('label')
-                            label1.htmlFor = "id_input_name" + idx
+                            label1.htmlFor = "id_prefix" + idx + "-name"
                             label1.innerText = "nazwa półki"
                             label1.className = "form-label"
 
                             let input_details = document.createElement("textarea")
                             input_details.className = "form-control"
-                            input_details.id = "id_input_details" + idx
+                            input_details.id = "id_prefix" + idx + "-details"
+                            input_details.name = "prefix" + idx + "-details"
                             input_details.innerHTML = details
 
                             let label2 = document.createElement('label')
-                            label2.htmlFor = "id_input_details" + idx
+                            label2.htmlFor = "id_prefix" + idx + "-details"
                             label2.innerText = "Opis półki"
                             label2.className = "form-label"
+
+                            let content = document.createElement("div")
+                            content.id = "shelve_form_content"+idx
 
                             let row = document.createElement("div")
                             row.className = "row"
@@ -272,7 +288,8 @@
 
                             row.appendChild(col1)
                             row.appendChild(col2)
-                            card_body.appendChild(row)
+                            shelve_form.appendChild(row)
+                            card_body.appendChild(shelve_form)
                             card_body.appendChild(document.createElement("br"))
                             card_body.appendChild(take_button)
                             card_body.appendChild(save_button)

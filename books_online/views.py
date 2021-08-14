@@ -3,26 +3,23 @@ import zipfile
 import codecs
 from io import BytesIO
 import threading
-
 from django.core import serializers
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 import time as t
-
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from .models import Temporary_book, Book, Shelve, BookCategory, Library
-
 from django.db.models import Q
-
-from .forms import Shelve_form, BookCategory_form, Search_form, Book_form, Book_category_search_form, Shelve_search_form
+from .forms import Shelve_form, BookCategory_form, Search_form, Book_form, Book_category_search_form, \
+    Shelve_search_form, Shelve_change_form
 from datetime import datetime
-
 from django.db.utils import IntegrityError
-
 from jsonview.decorators import json_view
+from django.db.models import Count
+
 
 # Create your views here.
 
@@ -124,46 +121,109 @@ def search_in_global_library(data="9788377972298", data_type="ISBN", temporary_b
     results_page(driver, temporary_book)
 
 
+def text_category_parser(text):
+    results = []
+    word = ''
+
+    def find_index():
+
+        nonlocal results
+        nonlocal word
+
+        without_space_pos_start = 0
+        while without_space_pos_start < len(word) and word[without_space_pos_start].isspace():
+            without_space_pos_start += 1
+
+        without_space_pos_end = len(word) - 1
+        while without_space_pos_end > -1 and word[without_space_pos_end].isspace():
+            without_space_pos_end -= 1
+        without_space_pos_end += 1
+
+        if word[without_space_pos_start:without_space_pos_end]:
+            all_cats = BookCategory.objects.filter(name=word[without_space_pos_start:without_space_pos_end])
+            for cat in all_cats:
+                results.append(cat.id)
+
+    for i in range(0, len(text)):
+        if text[i] == ',' or text[i] == '.':
+            find_index()
+            word = ''
+        elif text[i] != '\r' or text[i] != '\n':
+            word += text[i]
+    else:
+        if word:
+            find_index()
+
+    return results
+
+
 def book_object_filling(request, id=''):
+    something_change = False
+    first_add = False
+
     if id:
-        book = Book.objects.get(id=request.POST.get('id'))
+        book = Book.objects.get(pk=request.POST.get('id'))
     else:
         book = Book()
         id = request.POST.get("search_idx")
-        #for obj in Temporary_book._meta.get_fields():
-        #    if obj.name == "physical_location":
-        #        print(request.POST)
-        #        setattr(book, obj.name, Shelve.objects.get(name=request.POST.get("physical_location")))
-        #    elif obj.name == "price" and request.POST.get('price') == '':
-        #        pass
-        #    elif obj.name == "bought_date":
-        #        if request.POST.get("bought_date"):
-        #            date = datetime.strptime(request.POST.get(obj.name), '%d-%m-%Y').strftime('%Y-%m-%d')
-        #            setattr(book, obj.name, date)
-        #    else:
-        #        setattr(book, obj.name, request.POST.get(obj.name))
+        first_add = True
 
     for obj in Temporary_book._meta.get_fields():
-        if obj.name == "physical_location":
-            setattr(book, obj.name, Shelve.objects.get(name=request.POST.get(f"prefix{id}-physical_location")))
-        elif obj.name == "price" and request.POST.get(f"prefix{id}-price") == '':
-            pass
-        elif obj.name == "bought_date":
-            if request.POST.get(f"prefix{id}-bought_date"):
-                date = datetime.strptime(request.POST.get(obj.name), '%d-%m-%Y').strftime('%Y-%m-%d')
-                setattr(book, obj.name, date)
-        else:
-            setattr(book, obj.name, request.POST.get(f"prefix{id}-{obj.name}"))
+        try:
+            book_data = book.__getattribute__(obj.name)
+        except:
+            book_data = 'None'
 
-    book.save()
+        data = request.POST.get(f"prefix{id}-{obj.name}")
+
+        if obj.name != "id" and str(book_data) != str(data) and (book_data or data) or first_add:
+            something_change = True
+            if obj.name == "physical_location" and data:
+                setattr(book, obj.name, Shelve.objects.get(name=data))
+            elif obj.name == "price" and data == '':
+                pass
+            elif obj.name == "bought_date":
+                if data:
+                    date = datetime.strptime(data, '%d-%m-%Y').strftime('%Y-%m-%d')
+                    setattr(book, obj.name, date)
+            elif obj.name == "categories":
+                if not first_add:
+                    parsed_category = text_category_parser(data)
+                    book.categories_fk.set(parsed_category)
+                setattr(book, obj.name, data)
+            else:
+                setattr(book, obj.name, data)
+
+    if something_change:
+        book.save()
+
+    if first_add:
+        parsed_category = text_category_parser(request.POST.get(f"prefix{id}-categories"))
+        book.categories_fk.set(parsed_category)
+        book.save()
 
 
 @json_view
 def add_book_view(request, *args, **kwargs):
     if request.is_ajax():
         if request.POST.get('adding'):
-            book_object_filling(request)
-            return JsonResponse({}, status=200)
+            idx = request.POST.get('search_idx')
+            dict_copy = request.POST.copy()
+            try:
+                dict_copy[f'prefix{idx}-physical_location'] = Shelve.objects.get(
+                    name=request.POST.get(f'prefix{idx}-physical_location'))
+            except:
+                pass
+            book_form = Book_form(dict_copy or None, prefix="prefix" + request.POST.get("search_idx"))
+            if book_form.is_valid():
+                book_object_filling(request)
+                string_form = create_book_form(book_form, request.POST.get("search_idx"),
+                                               dict_copy[f'prefix{idx}-physical_location'], True)
+                return JsonResponse({'success': True, 'string_form': string_form}, status=200)
+            else:
+                string_form = create_book_form(book_form, request.POST.get("search_idx"),
+                                               dict_copy[f'prefix{idx}-physical_location'], True)
+                return JsonResponse({'success': False, 'string_form': string_form}, status=200)
         elif request.POST.get('delete'):
             var = Temporary_book.objects.get(search_number=request.POST.get("search_idx"))
             var.delete()
@@ -198,7 +258,7 @@ def add_book_view(request, *args, **kwargs):
                 book_data = Book()
                 for obj in Temporary_book._meta.get_fields():
                     setattr(book_data, obj.name, temp_obj.__getattribute__(obj.name))
-                book_form = Book_form(instance=book_data, prefix="prefix"+str(request.POST.get('search_idx')))
+                book_form = Book_form(instance=book_data, prefix="prefix" + str(request.POST.get('search_idx')))
                 string_form = create_book_form(book_form, idx)
                 data["book_form"] = string_form
 
@@ -245,9 +305,15 @@ def add_category(request, *args, **kwargs):
     return render(request, 'add_category.html', {'form': form})
 
 
-def create_book_form(book_form, search_idx, shelve_name=''):
+def create_book_form(book_form, search_idx, shelve_name='', validate_mode=False):
     is_odd = 0
     string_form = ''
+
+    if validate_mode:
+        error_dict = {}
+        for name, error in book_form.errors.items():
+            error_dict[name] = error
+
     for name, field in book_form.fields.items():
 
         string_representation = str(book_form[name])
@@ -259,19 +325,36 @@ def create_book_form(book_form, search_idx, shelve_name=''):
                 string_form += '<div class="row g-6">'
 
         if name != 'details' and name != 'categories' and name != 'physical_location':
-            string_form += '<div class="col-md-3">' + f'<label for="id_{name}" class="form-label-sm"> {field.label} </label>'
+            string_form += '<div class="col-md-3">' + f'<label for="id_prefix{search_idx}-{name}" class="form-label-sm"> {field.label} </label>'
         elif name == 'physical_location':
-            string_form += '<div class="col-md-12">' + f'<label for="id_{name}" class="form-label-sm"> {field.label} </label>'
+            string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-{name}" class="form-label-sm"> {field.label} </label>'
 
             if shelve_name:
                 idx_value_start = string_representation.find("value=")
-                idx_value_end = string_representation.find(" ", 44)
-                string_representation = string_representation[:idx_value_start] + "value=\"" + str(
-                    shelve_name) + "\"" + string_representation[idx_value_end:]
+                if idx_value_start >= 0:
+                    idx_value_end = string_representation.find(" ", 44)
+                    string_representation = string_representation[:idx_value_start] + "value=\"" + str(
+                        shelve_name) + "\"" + string_representation[idx_value_end:]
         else:
-            string_form += '<div class="col-md-6">' + f'<label for="id_{name}" class="form-label-sm"> {field.label} </label>'
+            string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-{name}" class="form-label-sm"> {field.label} </label>'
 
-        string_form += string_representation + '</div>'
+        if not validate_mode:
+            string_form += string_representation + '</div>'
+        else:
+            try:
+                error_text = str(error_dict[name])[26:-10]
+                print(error_text)
+                class_position = string_representation.find("class=")
+                string_form += string_representation[
+                               :class_position] + 'class="form-control input form-control is-invalid" ' + string_representation[
+                                                                                                          class_position + 20:]
+                string_form += f'<span id="error_1_id_prefix{search_idx}-{name}" class="invalid-feedback"><strong>{error_text}</strong></span>'
+            except BaseException as e:
+                class_position = string_representation.find("class=")
+                string_form += string_representation[
+                               :class_position] + 'class="form-control input form-control is-valid" ' + string_representation[
+                                                                                                        class_position + 20:]
+            string_form += '</div>'
 
         if not (is_odd + 1) % 4:
             string_form += '</div>'
@@ -299,13 +382,33 @@ def search_books_view(request, *args, **kwargs):
     if request.is_ajax():
         if request.POST.get('mode') == "search_book":
             book_object = Book.objects.get(id=request.POST.get('id'))
-            book_form = Book_form(instance=book_object, prefix="prefix"+str(request.POST.get('id')))
+            book_form = Book_form(instance=book_object, prefix="prefix" + str(request.POST.get('id')))
             shelve_name = book_object.physical_location
             string_form = create_book_form(book_form, request.POST.get('id'), shelve_name)
             return JsonResponse({"book_form": string_form}, status=200)
         elif request.POST.get('mode') == "change_book":
-            book_object_filling(request, request.POST.get("id"))
-            return JsonResponse({"changed_title": request.POST.get('title')}, status=200)
+            idx = request.POST.get('id')
+            dict_copy = request.POST.copy()
+
+            try:
+                dict_copy[f'prefix{idx}-physical_location'] = Shelve.objects.get(
+                    name=request.POST.get(f'prefix{idx}-physical_location'))
+            except:
+                pass
+
+            book_form = Book_form(dict_copy or None, prefix="prefix" + request.POST.get("id"))
+
+            if book_form.is_valid():
+                book_object_filling(request, request.POST.get('id'))
+                string_form = create_book_form(book_form, request.POST.get("id"),
+                                               dict_copy[f'prefix{idx}-physical_location'], True)
+                return JsonResponse({'success': True, "changed_title": request.POST.get(f'prefix{idx}-title'),
+                                     'string_form': string_form}, status=200)
+            else:
+                book_object = Book.objects.get(id=request.POST.get('id'))
+                shelve_name = book_object.physical_location
+                string_form = create_book_form(book_form, request.POST.get("id"), shelve_name, True)
+                return JsonResponse({'success': False, 'string_form': string_form}, status=200)
         else:
             Book.objects.get(id=request.POST.get('id')).delete()
             return JsonResponse({}, status=200)
@@ -358,16 +461,55 @@ def search_books_view(request, *args, **kwargs):
     return render(request, 'search_books.html', context)
 
 
+def shelves_form_string(form, search_idx, first_form=False):
+    error_dict = {}
+    for name, error in form.errors.items():
+        error_dict[name] = error
+
+    if not first_form:
+        string_form = '<div class ="row">'
+        for name, field in form.fields.items():
+            string_representation = str(form[name])
+            string_form += '<div class ="col">'
+            string_form += f'<label for="id_prefix{search_idx}-{name}" class="form-label"> {field.label} </label>'
+            try:
+                error_text = error_dict[name]
+                class_position = string_representation.find("class=")
+                string_form += string_representation[
+                               :class_position] + 'class="form-control input form-control is-invalid" ' \
+                               + string_representation[class_position + 20:]
+                string_form += f'<span id="error_1_id_prefix{search_idx}-{name}" class="invalid-feedback"><strong>{error_text}</strong></span>'
+            except:
+                class_position = string_representation.find("class=")
+                string_form += string_representation[
+                               :class_position] + 'class="form-control input form-control is-valid" ' \
+                               + string_representation[class_position + 20:]
+            string_form += '</div>'
+    else:
+        string_form = '<div class ="row">'
+        for name, field in form.fields.items():
+            string_form += '<div class ="col">'
+            string_form += f'<label for="id_input_{name}{search_idx}" class="form-label"> {field.label} </label>'
+            string_form += str(form[name])
+            string_form += '</div>'
+    return string_form
+
+
 def search_shelves_view(request, *args, **kwargs):
     if request.is_ajax():
         if request.POST.get('mode') == "change_book":
-            shelve = Shelve.objects.get(id=request.POST.get('id'))
-
-            for obj in Shelve._meta.get_fields():
-                setattr(shelve, obj.name, request.POST.get(obj.name))
-            shelve.save()
-
-            return JsonResponse({"changed_name": request.POST.get('name')}, status=200)
+            form = Shelve_change_form(request.POST or None, prefix='prefix' + request.POST.get('id'))
+            if form.is_valid():
+                shelve = Shelve.objects.get(id=request.POST.get('id'))
+                setattr(shelve, 'name', request.POST.get(f"prefix{request.POST.get('id')}-name"))
+                setattr(shelve, 'details', request.POST.get(f"prefix{request.POST.get('id')}-details"))
+                shelve.save()
+                form_html = shelves_form_string(form, request.POST.get('id'))
+                return JsonResponse({"success": True, "changed_name": shelve.name, "form_html": form_html},
+                                    status=200)
+            else:
+                form_html = shelves_form_string(form, request.POST.get('id'))
+                return JsonResponse({"success": False, "form_html": form_html}, status=200)
 
         elif request.POST.get('mode') == "search_chosen":
             print(request.POST)
@@ -413,8 +555,6 @@ def search_category_view(request, *args, **kwargs):
             return JsonResponse({"changed_name": request.POST.get('name')}, status=200)
 
         elif request.POST.get('mode') == "search_chosen":
-            print(request.POST)
-
             idx = [m['id'] for m in BookCategory.objects.filter(name__contains=request.POST.get('name')).values('id')]
             names = [m['name'] for m in
                      BookCategory.objects.filter(name__contains=request.POST.get('name')).values('name')]
@@ -422,8 +562,12 @@ def search_category_view(request, *args, **kwargs):
             return JsonResponse({"idx": idx, "names": names, "length": len(idx)}, status=200)
 
         else:
-            BookCategory.objects.get(id=request.POST.get('id')).delete()
-            return JsonResponse({}, status=200)
+            objects = Book.objects.filter(categories_fk=request.POST.get('id'))
+            if len(objects):
+                return JsonResponse({'success': False}, status=200)
+            else:
+                BookCategory.objects.get(id=request.POST.get('id')).delete()
+                return JsonResponse({'success': True}, status=200)
 
     else:
         form = Book_category_search_form()
@@ -566,3 +710,33 @@ def load_backup_view(request, *args, **kwargs):
                     book = Book()
 
     return render(request, 'load_backup.html', {})
+
+
+def statistic_view(request, *args, **kwargs):
+
+    counter_field = 'ISBN'
+    page = 1
+
+    if request.method == 'POST':
+        page = int(request.POST.get("page"))
+
+    dict = Book.objects.values(counter_field).annotate(the_count=Count(counter_field)).order_by('-the_count')
+    slots = min(20, len(dict) - ((page-1) * 20))
+
+    total_val = (len(dict)-1) // 20
+    all_pages = 1 if total_val < 0 else total_val + 1
+    small_dict = dict[(page-1)*20 : (page-1)*20+slots]
+
+    results = {}
+
+    for obj in small_dict:
+        data = Book.objects.filter(ISBN=obj['ISBN'])[:1].values()
+        results[obj['ISBN']] = {'author': data[0]['author'], "title": data[0]['title'], 'ISBN': data[0]['ISBN'], "the_count": obj['the_count']}
+
+    context = {
+        "results": results,
+        "page": page,
+        "all_pages": all_pages
+    }
+
+    return render(request, 'statistic.html', context)

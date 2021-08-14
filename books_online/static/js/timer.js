@@ -18,7 +18,7 @@ function timer_own(search_idx){
 
     numb_ = document.createElement("div")
     numb_.className = "numb"
-    numb_.innerText = "0%"
+    numb_.innerText = "wait...."
     numb_.id = "numb"+search_idx
 
     circle = document.createElement("div")

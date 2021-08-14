@@ -11,11 +11,13 @@
     <link rel="stylesheet" href="{% static 'js/bootstrap-datepicker.css' %}">
     <script type="text/javascript" src="{% static 'js/bootstrap-datepicker.js' %}"> </script>
     <script type="text/javascript" src="{% static 'js/external_window_handlers.js' %}"> </script>
+    <script type="text/javascript" src="{% static 'js/cover_up_windows.js' %}"> </script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 {% endblock %}
 
 {% block main_header %}
     <p style="font-size: 40px;"> Wyszukaj książki </p>
+    <button onclick="location.href ='http://127.0.0.1:8000/'" class="btn btn-info" style="float: right; margin: 10px"> Menu </button>
 {% endblock %}
 
 {% block main_article %}
@@ -86,67 +88,68 @@
         {% csrf_token %}
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label for="{{ form.author.id_for_label }}" class="form-label"> {{ form.author.label }} </label>
+                    <label for="{{ form.author.id_for_label }}" class="form-label-sm"> {{ form.author.label }} </label>
                     {{form.author}}
                 </div>
 
                 <div class="col-md-3">
-                    <label for="{{ form.title.id_for_label }}" class="form-label"> {{ form.title.label }} </label>
+                    <label for="{{ form.title.id_for_label }}" class="form-label-sm"> {{ form.title.label }} </label>
                     {{ form.title }}
                 </div>
 
                 <div class="col-md-3">
-                    <label for="{{ form.ISBN.id_for_label }}" class="form-label"> {{ form.ISBN.label }} </label>
+                    <label for="{{ form.ISBN.id_for_label }}" class="form-label-sm"> {{ form.ISBN.label }} </label>
                     {{form.ISBN}}
                 </div>
 
                 <div class="col-md-3">
-                    <label for="{{ form.publisher.id_for_label }}" class="form-label"> {{ form.publisher.label }} </label>
+                    <label for="{{ form.publisher.id_for_label }}" class="form-label-sm"> {{ form.publisher.label }} </label>
                     {{ form.publisher }}
                 </div>
             </div>
 
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label for="{{ form.published_city.id_for_label }}" class="form-label"> {{ form.published_city.label }} </label>
+                    <label for="{{ form.published_city.id_for_label }}" class="form-label-sm"> {{ form.published_city.label }} </label>
                     {{form.published_city}}
                 </div>
 
                 <div class="col-md-3">
-                    <label for="{{ form.published_year.id_for_label }}" class="form-label"> {{ form.published_year.label }} </label>
+                    <label for="{{ form.published_year.id_for_label }}" class="form-label-sm"> {{ form.published_year.label }} </label>
                     {{ form.published_year }}
                 </div>
 
                 <div class="col-md-3">
-                    <label for="{{ form.bought_date1.id_for_label }}" class="form-label"> {{ form.bought_date1.label }} </label>
+                    <label for="{{ form.bought_date1.id_for_label }}" class="form-label-sm"> {{ form.bought_date1.label }} </label>
                     {{form.bought_date1}}
                 </div>
 
                 <div class="col-md-3">
-                    <label for="{{ form.bought_date2.id_for_label }}" class="form-label"> {{ form.bought_date2.label }} </label>
+                    <label for="{{ form.bought_date2.id_for_label }}" class="form-label-sm"> {{ form.bought_date2.label }} </label>
                     {{ form.bought_date2 }}
                 </div>
             </div>
 
             <div class="row">
                 <div class="col">
-                    <label for="{{ form.category.id_for_label }}" class="form-label"> {{ form.category.label }} </label>
+                    <label for="{{ form.category.id_for_label }}" class="form-label-sm"> {{ form.category.label }} </label>
                     {{form.category}}
                 </div>
 
                 <div class="col">
-                    <label for="{{ form.localization.id_for_label }}" class="form-label"> {{ form.localization.label }} </label>
+                    <label for="{{ form.localization.id_for_label }}" class="form-label-sm"> {{ form.localization.label }} </label>
                     {{ form.localization }}
                 </div>
             </div>
-
             <br>
-
-            <div class="d-flex justify-content-center">
+             <div class="d-flex justify-content-center">
                 <input type="submit" value="Szukaj" class="col-md-3 btn btn-success">
                 <input type="reset" value="Wyczyść" class="col-md-3 btn btn-danger">
             </div>
         </form>
+
+
+
     </div>
 
     <div id="results">
@@ -162,10 +165,31 @@
                     url: "/search_books",
                     data: form_data,
                     success: function (response) {
-                        let title_elem = document.getElementById("book_text"+idx)
-                        if(title_elem.innerHTML !== response.changed_title){
-                              title_elem.innerHTML =  "id: " + idx + " , " + response.changed_title
+                        if(response.success){
+                            let title_elem = document.getElementById("book_text"+idx)
+                            if(title_elem.innerHTML !== response.changed_title){
+                                title_elem.innerHTML =  "id: " + idx + " , " + response.changed_title
+                            }
+                            let handler = document.getElementById("container_book"+idx)
+                            create_cover_up("success", handler, idx)
+
                         }
+                        else if(!response.success){
+                            let handler = document.getElementById("container_book"+idx)
+                            create_cover_up("failure", handler, idx)
+                        }
+
+                        let parser = new DOMParser();
+                        let parsed_form = parser.parseFromString(response.string_form, 'text/html').body.innerHTML
+
+                        let form = document.getElementById("book_form"+idx)
+                        while (form.firstChild) {
+                            if(form.firstChild.textContent === "Zapisz zmiany" || form.firstChild.textContent === "Usuń")
+                                break;
+                            form.removeChild(form.firstChild);
+                        }
+                        form.insertAdjacentHTML('afterbegin',parsed_form)
+
                     },
                     error: function (error) {
                         console.log(this.error)
@@ -206,7 +230,7 @@
             function show_book_details(idx){
                 let book_container = document.getElementById("book_form"+idx)
                 if (!book_container){
-                    document.getElementById("book_show"+idx).innerText = "up"
+                    document.getElementById("book_show"+idx).innerText = "zwiń"
 
                     let form_data = new FormData()
                     form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
@@ -288,16 +312,19 @@
                 let show_button = document.createElement("div");
                 show_button.id = "book_show" + idx
                 show_button.className = "btn btn-light btn-sm"
-                show_button.innerText  = "down"
+                show_button.style="float: right;"
+                show_button.innerText  = "rozwiń"
                 show_button.onclick = function (){
                     let book_case = document.getElementById("container_book"+idx)
                     if (book_case.className === "results_block_clicked"){
                         book_case.className = "results_block"
-                        this.innerText = "down"
+                        document.getElementById("book_form"+idx).hidden = true
+                        this.innerText = "rozwiń"
                     }
                     else if(document.getElementById("container_book"+idx)){
                         book_case.className = "results_block_clicked"
-                        this.innerText = "up"
+                        document.getElementById("book_form"+idx).hidden = false
+                        this.innerText = "zwiń"
                     }
                 }
                 div.appendChild(paragraph)
