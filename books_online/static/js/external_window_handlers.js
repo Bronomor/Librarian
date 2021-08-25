@@ -1,3 +1,5 @@
+<!-- 1 dodawanie, 2 Zapisz zmiany, 3 usuwanie 4 wybieranie-->
+
 let HANDLE_SHELVE_WINDOW = null
 let HANDLE_CATEGORY_WINDOW = null
 let interval_shelves_search;
@@ -34,7 +36,7 @@ function check_shelve_change(search_idx){
 
 
 function check_category_change(search_idx){
-    if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText === "1") {
+    if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText == "1") {
         let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
         let new_name = HANDLE_CATEGORY_WINDOW.document.getElementById("new_shelve_name").innerText
         if (old_name !== new_name) HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText = ''
@@ -50,16 +52,16 @@ function check_category_change(search_idx){
             }
         }
     }
-    else if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText === "4"){
+    else if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText == "4"){
         let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
-
+        console.log(old_name)
         let categories_elem = document.getElementById("id_prefix"+search_idx+"-categories")
         if(categories_elem.innerHTML.length)
             categories_elem.innerHTML +=  " , " + old_name
         else
             categories_elem.innerHTML = old_name
     }
-    else if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText === "3"){
+    else if(HANDLE_CATEGORY_WINDOW.document.getElementById("something_change").innerText == "3"){
         let old_name = HANDLE_CATEGORY_WINDOW.document.getElementById("old_shelve_name").innerText
         let text_content = document.getElementById("id_prefix"+search_idx+"-categories")
 
@@ -132,12 +134,12 @@ function func_category_window_close(mode, search_idx) {
         if (mode === "add") {
             let data = HANDLE_CATEGORY_WINDOW.document.getElementById("id_name").value
             if(data) {
-                let form_categories = document.getElementById("book_form" + search_idx).elements["id_prefix" + search_idx + "-categories"];
+                let form_categories = document.getElementById("id_prefix"+search_idx+"-categories")
 
-                if (form_categories.value.length > 0)
-                    form_categories.value += " , " + data
+                if (form_categories.innerHTML.length > 0)
+                    form_categories.innerHTML += " , " + data
                 else
-                    form_categories.value = data
+                    form_categories.innerHTML = data
 
                 let list = document.getElementById("id_category_list")
                 let option = document.createElement('option')
@@ -154,11 +156,11 @@ function func_category_window_close(mode, search_idx) {
 
 
                 if (old_value === new_value){
-                    let form_categories = document.getElementById("book_form"+search_idx).elements["id_prefix" + search_idx + "-categories"];
-                    if(form_categories.value.length > 0)
-                        form_categories.value += " , " + new_value
+                    let form_categories = document.getElementById("id_prefix"+search_idx+"-categories")
+                    if(form_categories.innerHTML.length > 0)
+                        form_categories.innerHTML += " , " + new_value
                     else
-                        form_categories.value = new_value
+                        form_categories.innerHTML = new_value
                 }
                 elem.innerText = ''
             }

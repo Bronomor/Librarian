@@ -11,20 +11,36 @@
     <script type="text/javascript" src="{% static 'js/external_window_handlers.js' %}"> </script>
     <link rel="stylesheet" href="{% static 'js/bootstrap-datepicker.css' %}">
     <script type="text/javascript" src="{% static 'js/bootstrap-datepicker.js' %}"> </script>
+    <script type="text/javascript" src="{% static 'js/cover_up_windows.js' %}"> </script>
 {% endblock %}
 
 {% block main_header %}
     <script>
         document.getElementById("main_header").style="position: sticky; top: 0;";
+        function switch_sub_menu(index){
+            document.getElementById("part1").style.display = "none";
+            document.getElementById("header_part1").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part2").style.display = "none";
+            document.getElementById("header_part2").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part3").style.display = "none";
+            document.getElementById("header_part3").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part4").style.display = "none";
+            document.getElementById("header_part4").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part"+index).style.display = "block";
+            document.getElementById("header_part"+index).className = "slot_sub_menu_active col-md-3";
+        }
     </script>
 
     <div style="text-align: center; padding: 12px">
-
         <button onclick="add_book_slot()" class="btn btn-info">
             Dodaj nowy slot na dodawaną książkę
         </button>
 
-        <button onclick="scroll_to_elem('bottom')" class="btn btn-info">
+        <button onclick="scroll_to_elem('bottom')" class="btn btn-info" >
             Przejść dalej
         </button>
 
@@ -33,7 +49,8 @@
         <button onclick="scroll_to_elem('top')" class="btn btn-info">
             Powrócić
         </button>
-        <button onclick="location.href ='http://127.0.0.1:8000/'" class="btn btn-info" style="float: right;"> Menu </button>
+
+        <button onclick="location.href ='/'" class="btn btn-info" style="float: right;"> Menu </button>
     </div>
 
 

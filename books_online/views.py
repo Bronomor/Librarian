@@ -11,14 +11,16 @@ import time as t
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
-from .models import Temporary_book, Book, Shelve, BookCategory, Library
+from .models import Temporary_book, Book, Shelve, BookCategory
 from django.db.models import Q
 from .forms import Shelve_form, BookCategory_form, Search_form, Book_form, Book_category_search_form, \
     Shelve_search_form, Shelve_change_form
 from datetime import datetime
 from django.db.utils import IntegrityError
-from jsonview.decorators import json_view
 from django.db.models import Count
+import os
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from selenium.webdriver.chrome.options import Options
 
 
 # Create your views here.
@@ -111,6 +113,8 @@ def results_page(driver, temporary_book):
 
 def search_in_global_library(data="9788377972298", data_type="ISBN", temporary_book=None,
                              url='https://karo.umk.pl/Karo/'):
+    # driver = webdriver.Remote("http://localhost:4444/wd/hub", desired_capabilities=DesiredCapabilities.CHROME)
+
     options = webdriver.ChromeOptions()
     options.add_argument("headless")
     driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
@@ -120,15 +124,19 @@ def search_in_global_library(data="9788377972298", data_type="ISBN", temporary_b
     t.sleep(33)
     results_page(driver, temporary_book)
 
+    driver.close()
+
 
 def text_category_parser(text):
     results = []
     word = ''
+    used_category = set()
 
     def find_index():
 
         nonlocal results
         nonlocal word
+        nonlocal used_category
 
         without_space_pos_start = 0
         while without_space_pos_start < len(word) and word[without_space_pos_start].isspace():
@@ -143,6 +151,7 @@ def text_category_parser(text):
             all_cats = BookCategory.objects.filter(name=word[without_space_pos_start:without_space_pos_end])
             for cat in all_cats:
                 results.append(cat.id)
+                used_category.add(word[without_space_pos_start:without_space_pos_end])
 
     for i in range(0, len(text)):
         if text[i] == ',' or text[i] == '.':
@@ -151,21 +160,23 @@ def text_category_parser(text):
         elif text[i] != '\r' or text[i] != '\n':
             word += text[i]
     else:
-        if word:
-            find_index()
+        find_index()
 
-    return results
+    return results, used_category
 
 
-def book_object_filling(request, id=''):
+def book_object_filling(request, id='', old_idx=''):
     something_change = False
     first_add = False
 
+    categories_set = set()
+
     if id:
-        book = Book.objects.get(pk=request.POST.get('id'))
+        book = Book.objects.get(serial_key=old_idx)
     else:
         book = Book()
         id = request.POST.get("search_idx")
+        old_idx = id
         first_add = True
 
     for obj in Temporary_book._meta.get_fields():
@@ -188,9 +199,15 @@ def book_object_filling(request, id=''):
                     setattr(book, obj.name, date)
             elif obj.name == "categories":
                 if not first_add:
-                    parsed_category = text_category_parser(data)
+                    parsed_category, categories_set = text_category_parser(data)
+                    string_categories = ''
+                    for elem in categories_set:
+                        string_categories += elem + ', '
+                    setattr(book, obj.name, string_categories)
                     book.categories_fk.set(parsed_category)
-                setattr(book, obj.name, data)
+                else:
+                    setattr(book, obj.name, data)
+                    categories_set.add(data)
             else:
                 setattr(book, obj.name, data)
 
@@ -198,12 +215,17 @@ def book_object_filling(request, id=''):
         book.save()
 
     if first_add:
-        parsed_category = text_category_parser(request.POST.get(f"prefix{id}-categories"))
+        parsed_category, categories_set = text_category_parser(request.POST.get(f"prefix{id}-categories"))
+        string_categories = ''
+        for elem in categories_set:
+            string_categories += elem + ', '
+        setattr(book,  "categories", string_categories)
         book.categories_fk.set(parsed_category)
         book.save()
 
+    return categories_set
 
-@json_view
+
 def add_book_view(request, *args, **kwargs):
     if request.is_ajax():
         if request.POST.get('adding'):
@@ -213,17 +235,18 @@ def add_book_view(request, *args, **kwargs):
                 dict_copy[f'prefix{idx}-physical_location'] = Shelve.objects.get(
                     name=request.POST.get(f'prefix{idx}-physical_location'))
             except:
-                pass
+                pass  # todo...
+
             book_form = Book_form(dict_copy or None, prefix="prefix" + request.POST.get("search_idx"))
             if book_form.is_valid():
                 book_object_filling(request)
                 string_form = create_book_form(book_form, request.POST.get("search_idx"),
                                                dict_copy[f'prefix{idx}-physical_location'], True)
-                return JsonResponse({'success': True, 'string_form': string_form}, status=200)
+                return JsonResponse({'success': True, 'book_form': string_form}, status=200)
             else:
                 string_form = create_book_form(book_form, request.POST.get("search_idx"),
                                                dict_copy[f'prefix{idx}-physical_location'], True)
-                return JsonResponse({'success': False, 'string_form': string_form}, status=200)
+                return JsonResponse({'success': False, 'book_form': string_form}, status=200)
         elif request.POST.get('delete'):
             var = Temporary_book.objects.get(search_number=request.POST.get("search_idx"))
             var.delete()
@@ -237,23 +260,29 @@ def add_book_view(request, *args, **kwargs):
                 if val:
                     val.delete()
             except ObjectDoesNotExist:
-                pass
+                pass  # if object not exist we dont need to release slot
 
             temporary_book = Temporary_book()
             temporary_book.search_number = idx
             temporary_book.ISBN = ISBN
             temporary_book.save()
 
-            thread_ = threading.Thread(target=search_in_global_library(ISBN, "ISBN", temporary_book), daemon=True)
-            thread_.start()
-
+            try:
+                thread_ = threading.Thread(target=search_in_global_library(ISBN, "ISBN", temporary_book), daemon=True)
+                thread_.start()
+            except:
+                book_form = Book_form(None, prefix="prefix" + request.POST.get("search_idx"))
+                string_form = create_book_form(book_form, request.POST.get("search_idx"))
+                return JsonResponse({"search_index": idx, "book_form": string_form}, status=200)
             return JsonResponse({"search_index": idx}, status=200)
+
         elif request.POST.get('mode') == 'searching_book_g_library_results':
             idx = request.POST.get('search_idx')
             temp_obj = Temporary_book.objects.get(search_number=idx)
+
             if temp_obj.is_complete_search:
 
-                data = {"status": 1}
+                data = {"success": 1}
 
                 book_data = Book()
                 for obj in Temporary_book._meta.get_fields():
@@ -264,12 +293,12 @@ def add_book_view(request, *args, **kwargs):
 
                 return JsonResponse(data, status=200)
             else:
-                return JsonResponse({"status": 0}, status=200)
+                return JsonResponse({"success": 0}, status=200)
 
-    context = {'datalist_author': [m['author'] for m in Book.objects.values('author')],
-               'datalist_location': [m['name'] for m in Shelve.objects.values('name')],
-               'datalist_publisher': [m['publisher'] for m in Book.objects.values('publisher')],
-               'datalist_category': [m['name'] for m in BookCategory.objects.values('name')]}
+    context = {'datalist_author': {m['author'] for m in Book.objects.values('author')},
+               'datalist_location': {m['name'] for m in Shelve.objects.values('name')},
+               'datalist_publisher': {m['publisher'] for m in Book.objects.values('publisher')},
+               'datalist_category': {m['name'] for m in BookCategory.objects.values('name')}}
 
     return render(request, 'add_books.html', context)
 
@@ -280,7 +309,6 @@ def main_site(request, *args, **kwargs):
 
 def add_shelves(request, *args, **kwargs):
     if request.method == 'POST':
-        print("asd")
         form = Shelve_form(request.POST)
         if form.is_valid():
             obj = Shelve.objects.create()
@@ -305,73 +333,109 @@ def add_category(request, *args, **kwargs):
     return render(request, 'add_category.html', {'form': form})
 
 
-def create_book_form(book_form, search_idx, shelve_name='', validate_mode=False):
-    is_odd = 0
-    string_form = ''
-
-    if validate_mode:
-        error_dict = {}
-        for name, error in book_form.errors.items():
-            error_dict[name] = error
-
-    for name, field in book_form.fields.items():
-
-        string_representation = str(book_form[name])
-
-        if not is_odd % 4:
-            if name != 'details':
-                string_form += '<div class="row g-3">'
-            else:
-                string_form += '<div class="row g-6">'
-
-        if name != 'details' and name != 'categories' and name != 'physical_location':
-            string_form += '<div class="col-md-3">' + f'<label for="id_prefix{search_idx}-{name}" class="form-label-sm"> {field.label} </label>'
-        elif name == 'physical_location':
-            string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-{name}" class="form-label-sm"> {field.label} </label>'
-
-            if shelve_name:
-                idx_value_start = string_representation.find("value=")
-                if idx_value_start >= 0:
-                    idx_value_end = string_representation.find(" ", 44)
-                    string_representation = string_representation[:idx_value_start] + "value=\"" + str(
-                        shelve_name) + "\"" + string_representation[idx_value_end:]
-        else:
-            string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-{name}" class="form-label-sm"> {field.label} </label>'
-
+def create_book_form(book_form, search_idx, shelve_name='', validate_mode=False, change_book=False, categories_set = ''):
+    def validate_messages(string_repr, name):
+        nonlocal string_form, error_dict, validate_mode
         if not validate_mode:
-            string_form += string_representation + '</div>'
+            string_form += string_repr + '</div>'
         else:
             try:
                 error_text = str(error_dict[name])[26:-10]
-                print(error_text)
-                class_position = string_representation.find("class=")
-                string_form += string_representation[
-                               :class_position] + 'class="form-control input form-control is-invalid" ' + string_representation[
+                class_position = string_repr.find("class=")
+                string_form += string_repr[
+                               :class_position] + 'class="form-control input form-control is-invalid" ' + string_repr[
                                                                                                           class_position + 20:]
-                string_form += f'<span id="error_1_id_prefix{search_idx}-{name}" class="invalid-feedback"><strong>{error_text}</strong></span>'
+                string_form += f'<span id="error_1_id_prefix{search_idx}-{name}" class="invalid-feedback"><strong>{error_text}</strong></span>' + '</div>'
             except BaseException as e:
-                class_position = string_representation.find("class=")
-                string_form += string_representation[
-                               :class_position] + 'class="form-control input form-control is-valid" ' + string_representation[
-                                                                                                        class_position + 20:]
-            string_form += '</div>'
+                class_position = string_repr.find("class=")
+                string_form += string_repr[
+                               :class_position] + 'class="form-control input form-control is-valid" ' + string_repr[
+                                                                                                        class_position + 20:] + '</div>'
 
-        if not (is_odd + 1) % 4:
-            string_form += '</div>'
+    string_form = '<div class="row">'
+    string_form += '<div id="header_part1" onclick="switch_sub_menu(\'1\')" class="slot_sub_menu_active col-md-3"> Główne </div>' \
+                   '<div id="header_part2" onclick="switch_sub_menu(\'2\')" class="slot_sub_menu_inactive col-md-3"> Opcjonalne </div>' \
+                   '<div id="header_part3" onclick="switch_sub_menu(\'3\')" class="slot_sub_menu_inactive col-md-3"> Media </div>' \
+                   '<div id="header_part4" onclick="switch_sub_menu(\'4\')" class="slot_sub_menu_inactive col-md-3"> Wypożyczenia </div>' \
+                   '</div>'
 
-        is_odd += 1
-    string_form += '</div> </br>'
+    error_dict = {}
+    for name, error in book_form.errors.items():
+        error_dict[name] = error
+
+    string_form += '<div id="part1"> <div class="row"> '
+    if not change_book:
+        string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-serial_key" class="form-label-sm"> {book_form["serial_key"].label} </label>'
+        validate_messages(str(book_form["serial_key"]), "serial_key")
+    else:
+        string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-serial_key" class="form-label-sm"> Numer katalogowy </label>'
+        string_form += f"<input type='text' name='prefix{search_idx}-serial_key' value='{book_form['serial_key'].value()}'" \
+                       f" class='form-control input form-control is-valid' required='' autocomplete='off' maxlength='100' id='id_prefix{search_idx}-serial_key'> </div>"
+    string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-ISBN" class="form-label-sm"> {book_form["ISBN"].label} </label>'
+    validate_messages(str(book_form["ISBN"]), "ISBN")
+    string_form += '</div>'
+    string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-author" class="form-label-sm"> {book_form["author"].label} </label>'
+    validate_messages(str(book_form["author"]), "author")
+    string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-title" class="form-label-sm"> {book_form["title"].label} </label>'
+    validate_messages(str(book_form["title"]), "title")
+    string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-physical_location" class="form-label-sm"> {book_form["physical_location"].label} </label>'
+    if shelve_name:
+        string_representation = str(book_form["physical_location"])
+        idx_value_start = string_representation.find("value=")
+        if idx_value_start >= 0:
+            idx_value_end = string_representation.find(" ", 44)
+            string_representation = string_representation[:idx_value_start] + "value=\"" + str(shelve_name) + "\"" + string_representation[idx_value_end:]
+        validate_messages(string_representation, "physical_location")
+    else:
+        validate_messages(str(book_form["physical_location"]), "physical_location")
+    string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-categories" class="form-label-sm"> {book_form["categories"].label} </label>'
+    if categories_set:
+        string_form += f"<textarea name='prefix{search_idx}-categories' cols='40' rows='10' " \
+                       f"class='form-control input form-control is-valid' autocomplete='off' maxlength='1000' id='id_prefix{search_idx}-categories'>"
+        for elem in categories_set:
+            string_form += elem + ', '
+        string_form += f"</textarea>"
+    else:
+        validate_messages(str(book_form["categories"]), "categories")
 
     button_search_loc = f'<button type="button" onclick = "func_search_loc(\'{search_idx}\')" class ="btn btn-success"> Edytuj półki </button>'
     button_add_loc = f'<button type="button"  onclick = "func_add_loc(\'{search_idx}\')" class ="btn btn-success"> Dodaj półkę </button>'
     button_add_cat = f'<button type="button"  onclick = "func_add_cat(\'{search_idx}\')" class ="btn btn-success"> Dodaj kategorie </button>'
     button_search_cat = f'<button type="button"  onclick = "func_search_cat(\'{search_idx}\')" class ="btn btn-success"> Edytuj kategorie </button>'
-
     string_form += '<div class="row">'
     string_form += '<div class="col">' + button_add_loc + '</div>'
     string_form += '<div class="col">' + button_search_loc + '</div>'
     string_form += '<div class="col">' + button_add_cat + '</div>'
     string_form += '<div class="col">' + button_search_cat + '</div>'
+    string_form += '</div>'
+
+    string_form += '</div> </div>'
+
+    string_form += '<div id="part2" style="display: none;"> '
+    string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-publisher" class="form-label-sm"> {book_form["publisher"].label} </label>'
+    validate_messages(str(book_form["publisher"]), "publisher")
+
+    string_form += '<div class="row">'
+    string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-published_city" class="form-label-sm"> {book_form["published_city"].label} </label>'
+    validate_messages(str(book_form["published_city"]), "published_city")
+    string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-published_year" class="form-label-sm"> {book_form["published_year"].label} </label>'
+    validate_messages(str(book_form["published_year"]), "published_year")
+    string_form += "</div>"
+
+    string_form += '<div class="row">'
+    string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-price" class="form-label-sm"> {book_form["price"].label} </label>'
+    validate_messages(str(book_form["price"]), "price")
+    string_form += '<div class="col-md-6">' + f'<label for="id_prefix{search_idx}-bought_date" class="form-label-sm"> {book_form["bought_date"].label} </label>'
+    validate_messages(str(book_form["bought_date"]), "bought_date")
+    string_form += "</div>"
+    string_form += '<div class="col-md-12">' + f'<label for="id_prefix{search_idx}-details" class="form-label-sm"> {book_form["details"].label} </label>'
+    validate_messages(str(book_form["details"]), "details")
+    string_form += '</div>'
+
+    string_form += '<div id="part3" style="display: none;"> '
+    string_form += '</div>'
+
+    string_form += '<div id="part4" style="display: none;"> '
     string_form += '</div>'
 
     return string_form
@@ -381,36 +445,46 @@ def search_books_view(request, *args, **kwargs):
     context = {'form': Search_form()}
     if request.is_ajax():
         if request.POST.get('mode') == "search_book":
-            book_object = Book.objects.get(id=request.POST.get('id'))
-            book_form = Book_form(instance=book_object, prefix="prefix" + str(request.POST.get('id')))
+            book_object = Book.objects.get(serial_key=request.POST.get('serial_key'))
+            book_form = Book_form(instance=book_object, prefix="prefix" + str(request.POST.get('serial_key')))
             shelve_name = book_object.physical_location
-            string_form = create_book_form(book_form, request.POST.get('id'), shelve_name)
+            string_form = create_book_form(book_form, request.POST.get('serial_key'), shelve_name)
             return JsonResponse({"book_form": string_form}, status=200)
         elif request.POST.get('mode') == "change_book":
-            idx = request.POST.get('id')
+
+            container_slot = request.POST.get("container_slot")
+            old_idx = request.POST.get("old_serial_key")
+            idx = request.POST.get(f"prefix{container_slot}-serial_key")
+
             dict_copy = request.POST.copy()
 
-            try:
-                dict_copy[f'prefix{idx}-physical_location'] = Shelve.objects.get(
-                    name=request.POST.get(f'prefix{idx}-physical_location'))
-            except:
-                pass
+            if dict_copy.get(f'prefix{container_slot}-physical_location', False):
+                dict_copy[f'prefix{container_slot}-physical_location'] = Shelve.objects.get(name=request.POST.get(f'prefix{container_slot}-physical_location'))
 
-            book_form = Book_form(dict_copy or None, prefix="prefix" + request.POST.get("id"))
+            book_form = Book_form(dict_copy or None, prefix="prefix" + str(container_slot))
 
             if book_form.is_valid():
-                book_object_filling(request, request.POST.get('id'))
-                string_form = create_book_form(book_form, request.POST.get("id"),
-                                               dict_copy[f'prefix{idx}-physical_location'], True)
-                return JsonResponse({'success': True, "changed_title": request.POST.get(f'prefix{idx}-title'),
+                categories_set = book_object_filling(request, container_slot, old_idx)
+                string_form = create_book_form(book_form, container_slot, dict_copy[f'prefix{container_slot}-physical_location'], True, False, categories_set)
+                return JsonResponse({'success': True, "changed_title": request.POST.get(f'prefix{container_slot}-title'), "new_idx": idx,
                                      'string_form': string_form}, status=200)
-            else:
-                book_object = Book.objects.get(id=request.POST.get('id'))
+            elif idx == old_idx and len(book_form.errors) == 1:
+                categories_set = book_object_filling(request, container_slot , old_idx)
+                string_form = create_book_form(book_form, container_slot, dict_copy[f'prefix{container_slot}-physical_location'], True, True, categories_set)
+                return JsonResponse({'success': True, "changed_title": request.POST.get(f'prefix{container_slot}-title'), "new_idx": idx,
+                                     'string_form': string_form}, status=200)
+            elif idx == old_idx:
+                book_object = Book.objects.get(serial_key=old_idx)
                 shelve_name = book_object.physical_location
-                string_form = create_book_form(book_form, request.POST.get("id"), shelve_name, True)
+                string_form = create_book_form(book_form, container_slot, shelve_name, True, True)
+                return JsonResponse({'success': False, 'string_form': string_form}, status=200)
+            else:
+                book_object = Book.objects.get(serial_key=old_idx)
+                shelve_name = book_object.physical_location
+                string_form = create_book_form(book_form, container_slot, shelve_name, True)
                 return JsonResponse({'success': False, 'string_form': string_form}, status=200)
         else:
-            Book.objects.get(id=request.POST.get('id')).delete()
+            Book.objects.get(serial_key=request.POST.get('serial_key')).delete()
             return JsonResponse({}, status=200)
 
     elif request.method == 'POST':
@@ -432,16 +506,48 @@ def search_books_view(request, *args, **kwargs):
         localization = request.POST.get('localization')
         category = request.POST.get('category')
 
-        tmp_res = {m['id']: m['title'] for m in Book.objects.filter(
-            Q(author__contains=author), Q(title__contains=title),
-            Q(ISBN__contains=ISBN), Q(publisher__contains=publisher),
-            Q(published_city__contains=published_city), Q(published_year__contains=published_year),
-            Q(physical_location__name__contains=localization), Q(categories__contains=category)
-        ).values('title', 'id')}
+        sort_option = request.POST.get("sort_options")
+
+        if sort_option == 'title_asc':
+            tmp_res = {m['serial_key']: m['title'] for m in Book.objects.filter(
+                Q(author__contains=author), Q(title__contains=title),
+                Q(ISBN__contains=ISBN), Q(publisher__contains=publisher),
+                Q(published_city__contains=published_city), Q(published_year__contains=published_year),
+                Q(physical_location__name__contains=localization), Q(categories__contains=category)
+            ).values('title', 'serial_key').order_by("title")}
+        elif sort_option == 'title_desc':
+            tmp_res = {m['serial_key']: m['title'] for m in Book.objects.filter(
+                Q(author__contains=author), Q(title__contains=title),
+                Q(ISBN__contains=ISBN), Q(publisher__contains=publisher),
+                Q(published_city__contains=published_city), Q(published_year__contains=published_year),
+                Q(physical_location__name__contains=localization), Q(categories__contains=category)
+            ).values('title', 'serial_key').order_by("-title")}
+        elif sort_option == 'selve_asc':
+            tmp_res = {m['serial_key']: m['title'] for m in Book.objects.filter(
+                Q(author__contains=author), Q(title__contains=title),
+                Q(ISBN__contains=ISBN), Q(publisher__contains=publisher),
+                Q(published_city__contains=published_city), Q(published_year__contains=published_year),
+                Q(physical_location__name__contains=localization), Q(categories__contains=category)
+            ).values('title', 'serial_key').order_by("physical_location")}
+        elif sort_option == 'selve_desc':
+            tmp_res = {m['serial_key']: m['title'] for m in Book.objects.filter(
+                Q(author__contains=author), Q(title__contains=title),
+                Q(ISBN__contains=ISBN), Q(publisher__contains=publisher),
+                Q(published_city__contains=published_city), Q(published_year__contains=published_year),
+                Q(physical_location__name__contains=localization), Q(categories__contains=category)
+            ).values('title', 'serial_key').order_by("-physical_location")}
+        else:
+            tmp_res = {m['serial_key']: m['title'] for m in Book.objects.filter(
+                Q(author__contains=author), Q(title__contains=title),
+                Q(ISBN__contains=ISBN), Q(publisher__contains=publisher),
+                Q(published_city__contains=published_city), Q(published_year__contains=published_year),
+                Q(physical_location__name__contains=localization), Q(categories__contains=category)
+            ).values('title', 'serial_key')}
 
         context["results"] = [*tmp_res.values()]
         context["results2"] = [*tmp_res.keys()]
 
+        # to show user in form what exactly is searching
         context["author"] = author
         context["title"] = title
         context["ISBN"] = ISBN
@@ -452,11 +558,12 @@ def search_books_view(request, *args, **kwargs):
         context["bought_date_2"] = bought_date_2
         context["localization"] = localization
         context["category"] = category
+        context["sort_option"] = sort_option
 
-    context['datalist_author'] = [m['author'] for m in Book.objects.values('author')]
-    context['datalist_location'] = [m['name'] for m in Shelve.objects.values('name')]
-    context['datalist_publisher'] = [m['publisher'] for m in Book.objects.values('publisher')]
-    context['datalist_category'] = [m['name'] for m in BookCategory.objects.values('name')]
+    context['datalist_author'] = {m['author'] for m in Book.objects.values('author')}
+    context['datalist_location'] = {m['name'] for m in Shelve.objects.values('name')}
+    context['datalist_publisher'] = {m['publisher'] for m in Book.objects.values('publisher')}
+    context['datalist_category'] = {m['name'] for m in BookCategory.objects.values('name')}
 
     return render(request, 'search_books.html', context)
 
@@ -512,8 +619,6 @@ def search_shelves_view(request, *args, **kwargs):
                 return JsonResponse({"success": False, "form_html": form_html}, status=200)
 
         elif request.POST.get('mode') == "search_chosen":
-            print(request.POST)
-
             idx = [m['id'] for m in Shelve.objects.filter(
                 Q(name__contains=request.POST.get('name')), Q(details__contains=request.POST.get('details'))).values(
                 'id')]
@@ -590,9 +695,9 @@ def handle_object(mode, idx):
         obj_handle = None
 
     if mode == 'Book':
-        labels = ["id", "author", "title", "ISBN", "publisher", "published_city", "published_year",
+        labels = ["serial_key", "author", "title", "ISBN", "publisher", "published_city", "published_year",
                   "price", "bought_date", "details", "physical_location", "categories"]
-        source = [obj_handle.id, obj_handle.author, obj_handle.title, obj_handle.ISBN, obj_handle.publisher,
+        source = [obj_handle.serial_key, obj_handle.author, obj_handle.title, obj_handle.ISBN, obj_handle.publisher,
                   obj_handle.published_city, obj_handle.published_year, obj_handle.price,
                   obj_handle.bought_date, obj_handle.details, obj_handle.physical_location, obj_handle.categories]
     elif mode == 'BookCategory':
@@ -647,10 +752,8 @@ def create_backup_view(request, *args, **kwargs):
 
 
 def load_backup_view(request, *args, **kwargs):
+
     if request.method == "POST":
-        print(request.FILES)
-        print(request.POST)
-        print("asdsa")
         if request.FILES:
             shelve_reader = csv.reader(codecs.iterdecode(request.FILES['shelve_input'], 'utf-8', errors='replace'),
                                        delimiter=';')
@@ -658,6 +761,8 @@ def load_backup_view(request, *args, **kwargs):
                 codecs.iterdecode(request.FILES['bookcategory_input'], 'utf-8', errors='replace'), delimiter=';')
             book_reader = csv.reader(codecs.iterdecode(request.FILES['book_input'], 'utf-8', errors='replace'),
                                      delimiter=';')
+
+            failed = []
 
             shelve = Shelve()
             for row in shelve_reader:
@@ -670,8 +775,7 @@ def load_backup_view(request, *args, **kwargs):
                         if shelve.name:
                             shelve.save()
                     except IntegrityError as e:
-                        print("error")
-                        print(shelve)
+                        failed.append(shelve)
                     shelve = Shelve()
 
             bookcategory = BookCategory()
@@ -685,8 +789,7 @@ def load_backup_view(request, *args, **kwargs):
                         except BookCategory.DoesNotExist as error:
                             bookcategory.save()
                         except IntegrityError as e:
-                            print("error")
-                            print(bookcategory)
+                            failed.append(shelve)
                     bookcategory = BookCategory()
 
             book = Book()
@@ -701,19 +804,19 @@ def load_backup_view(request, *args, **kwargs):
                 else:
                     if book.title:
                         try:
-                            Book.objects.get(id=book.pk)
+                            Book.objects.get(serial_key=book.serial_key)
                         except Book.DoesNotExist as error:
                             book.save()
                         except IntegrityError as e:
-                            print("error")
-                            print(book)
+                            failed.append(book)
                     book = Book()
 
-    return render(request, 'load_backup.html', {})
+        return render(request, 'load_backup.html', {"upload_files": True, "failed": failed})
+
+    return render(request, 'load_backup.html', {"upload_files": False})
 
 
 def statistic_view(request, *args, **kwargs):
-
     counter_field = 'ISBN'
     page = 1
 
@@ -721,17 +824,18 @@ def statistic_view(request, *args, **kwargs):
         page = int(request.POST.get("page"))
 
     dict = Book.objects.values(counter_field).annotate(the_count=Count(counter_field)).order_by('-the_count')
-    slots = min(20, len(dict) - ((page-1) * 20))
+    slots = min(20, len(dict) - ((page - 1) * 20))
 
-    total_val = (len(dict)-1) // 20
+    total_val = (len(dict) - 1) // 20
     all_pages = 1 if total_val < 0 else total_val + 1
-    small_dict = dict[(page-1)*20 : (page-1)*20+slots]
+    small_dict = dict[(page - 1) * 20: (page - 1) * 20 + slots]
 
     results = {}
 
     for obj in small_dict:
         data = Book.objects.filter(ISBN=obj['ISBN'])[:1].values()
-        results[obj['ISBN']] = {'author': data[0]['author'], "title": data[0]['title'], 'ISBN': data[0]['ISBN'], "the_count": obj['the_count']}
+        results[obj['ISBN']] = {'author': data[0]['author'], "title": data[0]['title'], 'ISBN': data[0]['ISBN'],
+                                "the_count": obj['the_count']}
 
     context = {
         "results": results,
@@ -740,3 +844,12 @@ def statistic_view(request, *args, **kwargs):
     }
 
     return render(request, 'statistic.html', context)
+
+
+def test_view(request, *args, **kwargs):
+    # if request.method == "POST":
+    # if request.FILES:
+    # shelve_reader = csv.reader(codecs.iterdecode(request.FILES['shelve_input'], 'utf-8', errors='replace'),
+    #                           delimiter=';')
+
+    return render(request, 'test.html', {})

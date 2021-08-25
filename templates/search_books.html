@@ -13,14 +13,44 @@
     <script type="text/javascript" src="{% static 'js/external_window_handlers.js' %}"> </script>
     <script type="text/javascript" src="{% static 'js/cover_up_windows.js' %}"> </script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <style type="text/css">
+    @media print{
+      html{ background-color:#FFFFFF; background-image:none; color:#000000 }
+    }
+    </style>
+
+
 {% endblock %}
 
 {% block main_header %}
     <p style="font-size: 40px;"> Wyszukaj książki </p>
-    <button onclick="location.href ='http://127.0.0.1:8000/'" class="btn btn-info" style="float: right; margin: 10px"> Menu </button>
+    <button onclick="location.href ='/'" class="btn btn-info" style="float: right; margin: 10px"> Menu </button>
+
 {% endblock %}
 
 {% block main_article %}
+
+    <script>
+        document.getElementById("main_header").style="position: sticky; top: 0;";
+        function switch_sub_menu(index){
+            document.getElementById("part1").style.display = "none";
+            document.getElementById("header_part1").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part2").style.display = "none";
+            document.getElementById("header_part2").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part3").style.display = "none";
+            document.getElementById("header_part3").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part4").style.display = "none";
+            document.getElementById("header_part4").className = "slot_sub_menu_inactive col-md-3";
+
+            document.getElementById("part"+index).style.display = "block";
+            document.getElementById("header_part"+index).className = "slot_sub_menu_active col-md-3";
+        }
+    </script>
+
 
     <datalist id="id_category_list"></datalist>
     <datalist id="id_localization_list"></datalist>
@@ -30,11 +60,11 @@
     <script type="text/javascript">
         let list = document.getElementById("id_author_list")
         let option;
-        {% for elem in datalist_author%}
-            option = document.createElement('option')
-            option.value = "{{elem}}"
-            list.appendChild(option);
-        {% endfor %}
+            {% for elem in datalist_author%}
+                option = document.createElement('option')
+                option.value = "{{elem}}"
+                list.appendChild(option);
+            {% endfor %}
 
         list = document.getElementById("id_publisher_list")
             {% for elem in datalist_publisher %}
@@ -45,7 +75,6 @@
 
         list = document.getElementById("id_localization_list")
             {% for elem in datalist_location %}
-                console.log("{{elem}}")
                 option = document.createElement('option')
                 option.value = "{{elem}}"
                 list.appendChild(option)
@@ -70,16 +99,21 @@
             document.getElementById("{{ form.published_city.id_for_label }}").value = "{{ published_city }}"
             document.getElementById("{{ form.published_year.id_for_label }}").value = "{{ published_year }}"
 
-            let date = new Date("{{ bought_date_1 }}")
-            let currentDate = date.toISOString().substring(0,10);
-            document.getElementById("{{ form.bought_date1.id_for_label }}").value   = currentDate
+            if("{{ bought_date_1 }}"){
+                let date = new Date("{{ bought_date_1 }}")
+                let currentDate = date.toISOString().substring(0,10);
+                document.getElementById("{{ form.bought_date1.id_for_label }}").value   = currentDate
+            }
 
-            date = new Date("{{ bought_date_2 }}")
-            currentDate = date.toISOString().substring(0,10);
-            document.getElementById("{{ form.bought_date2.id_for_label }}").value   = currentDate
+            if("{{ bought_date_2 }}"){
+                 date = new Date("{{ bought_date_2 }}")
+                currentDate = date.toISOString().substring(0,10);
+                document.getElementById("{{ form.bought_date2.id_for_label }}").value   = currentDate
+            }
 
             document.getElementById("{{ form.category.id_for_label }}").value = "{{ category }}"
             document.getElementById("{{ form.localization.id_for_label }}").value = "{{ localization }}"
+            $("#{{ form.sort_options.id_for_label }}").val("{{ sort_option }}");
         }
     </script>
 
@@ -142,22 +176,24 @@
                 </div>
             </div>
             <br>
-             <div class="d-flex justify-content-center">
+
+            <div class="d-flex justify-content-center">
+                <label for="{{ form.sort_options.id_for_label }}" class="form-label-sm"> {{ form.sort_options.label }} </label>
+                <div class="col-md-3">
+                    {{ form.sort_options }}
+                </div>
                 <input type="submit" value="Szukaj" class="col-md-3 btn btn-success">
                 <input type="reset" value="Wyczyść" class="col-md-3 btn btn-danger">
             </div>
         </form>
-
-
-
     </div>
-
     <div id="results">
         <script>
             function change_book_data(idx){
                 let form_data = new FormData(document.getElementById("book_form"+idx))
                     form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
-                    form_data.append('id', idx)
+                    form_data.append('old_serial_key', document.getElementById("book_text"+idx+"_2").innerText)
+                    form_data.append('container_slot', idx)
                     form_data.append('mode', 'change_book')
 
                 $.ajax({
@@ -166,13 +202,17 @@
                     data: form_data,
                     success: function (response) {
                         if(response.success){
-                            let title_elem = document.getElementById("book_text"+idx)
-                            if(title_elem.innerHTML !== response.changed_title){
-                                title_elem.innerHTML =  "id: " + idx + " , " + response.changed_title
+                            let title_elem2 = document.getElementById("book_text"+idx+"_2")
+                            let title_elem3 = document.getElementById("book_text"+idx+"_3")
+                            if(title_elem3.innerHTML !== response.changed_title){
+                                title_elem3.innerHTML = " " + response.changed_title
                             }
+                            if(title_elem2.innerHTML !== response.new_idx){
+                                title_elem2.innerHTML = response.new_idx
+                            }
+
                             let handler = document.getElementById("container_book"+idx)
                             create_cover_up("success", handler, idx)
-
                         }
                         else if(!response.success){
                             let handler = document.getElementById("container_book"+idx)
@@ -203,7 +243,7 @@
             function delete_book(idx){
                 let form_data = new FormData()
                     form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
-                    form_data.append('id', idx)
+                    form_data.append('serial_key', idx)
                     form_data.append('mode', 'delete_book')
 
                 $.ajax({
@@ -211,12 +251,17 @@
                     url: "/search_books",
                     data: form_data,
                     success: function (response) {
-                        let container = document.getElementById("book_form"+idx)
-                        while (container.firstChild) {
-                            container.removeChild(container.lastChild);
-                            console.log("asdas")
+                        let book_form = document.getElementById("book_form"+idx)
+                        while (book_form.firstChild) {
+                            book_form.removeChild(book_form.lastChild);
                         }
-                        container.remove()
+                        document.getElementById("book_text"+idx+"_1").remove()
+                        document.getElementById("book_text"+idx+"_2").remove()
+                        document.getElementById("book_text"+idx+"_3").remove()
+                        document.getElementById("book_show"+idx).remove()
+                        book_form.remove()
+                        document.getElementById("container_book"+idx).remove()
+
                     },
                     error: function (error) {
                         console.log(this.error)
@@ -234,7 +279,7 @@
 
                     let form_data = new FormData()
                     form_data.append('csrfmiddlewaretoken', '{{ csrf_token }}')
-                    form_data.append('id', idx)
+                    form_data.append('serial_key', idx)
                     form_data.append('mode', 'search_book')
 
                     $.ajax({
@@ -243,7 +288,7 @@
                         data: form_data,
                         success: function (response) {
                             if (!document.getElementById("book_form" + idx)) {
-                                document.getElementById("container_book" + idx).className = "results_block_clicked"
+                                document.getElementById("container_book" + idx).className = "results_block_clicked card-header"
                                 form_ = document.createElement("form")
                                 form_.id = "book_form" + idx
                                 form_.className = "search_page_edit_form"
@@ -299,14 +344,23 @@
 
                 let div = document.createElement("div");
                 div.id = "container_book" + idx
-                div.className = "results_block"
+                div.className = "results_block card-header"
+                div.style = "background-color: #666666;"
                 div.onclick = function (){
                     show_book_details(idx)
                 }
 
-                let paragraph = document.createElement("p");
-                paragraph.id = "book_text" + idx
-                paragraph.innerText  = "id: " + idx + " , " + {{results|safe}}[i]
+                let paragraph1 = document.createElement("p");
+                paragraph1.id = "book_text" + idx + "_1"
+                paragraph1.innerText  = "Numer katalogowy: "
+
+                let paragraph2 = document.createElement("p");
+                paragraph2.id = "book_text" + idx + "_2"
+                paragraph2.innerText  = idx
+
+                let paragraph3 = document.createElement("p");
+                paragraph3.id = "book_text" + idx + "_3"
+                paragraph3.innerText =  " , " + {{results|safe}}[i]
 
 
                 let show_button = document.createElement("div");
@@ -316,18 +370,24 @@
                 show_button.innerText  = "rozwiń"
                 show_button.onclick = function (){
                     let book_case = document.getElementById("container_book"+idx)
-                    if (book_case.className === "results_block_clicked"){
-                        book_case.className = "results_block"
-                        document.getElementById("book_form"+idx).hidden = true
+                    if (book_case.className === "results_block_clicked card-header"){
+                        book_case.className = "results_block card-header"
+                        let form_ = document.getElementById("book_form"+idx)
+                        if(form_)
+                            form_.style.display = "none";
                         this.innerText = "rozwiń"
                     }
-                    else if(document.getElementById("container_book"+idx)){
-                        book_case.className = "results_block_clicked"
-                        document.getElementById("book_form"+idx).hidden = false
+                    else if(book_case){
+                        book_case.className = "results_block_clicked card-header"
+                        let form_ = document.getElementById("book_form"+idx)
+                        if(form_)
+                            form_.style.display = "block";
                         this.innerText = "zwiń"
                     }
                 }
-                div.appendChild(paragraph)
+                div.appendChild(paragraph1)
+                div.appendChild(paragraph2)
+                div.appendChild(paragraph3)
                 div.appendChild(show_button)
                 global_div.appendChild(div)
             }

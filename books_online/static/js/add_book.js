@@ -119,7 +119,8 @@ function add_book_slot(){
         input_isbn.id = "input_isbn"+ACTUALLY_ADDING
         input_isbn.placeholder = "podaj ISBN"
         input_isbn.className = "form-control"
-
+        input_isbn.maxlength = 13
+        input_isbn.minLength = 13
 
     let button_search = document.createElement('button')
         button_search.id = "button_search" + ACTUALLY_ADDING
@@ -139,13 +140,26 @@ function add_book_slot(){
         }, false)
         button_release.className = "btn btn-info"
 
+    let row = document.createElement("div")
+    row.className = "row justify-content-center"
+
+    let col1 = document.createElement("div")
+    col1.className = "col-md-6"
+
+    let col2 = document.createElement("div")
+    col1.className = "col-md-6"
+
     container_book.innerHTML = text_isbn
     container_book.appendChild(document.createElement("br"))
-    container_book.appendChild(input_isbn)
-    container_book.appendChild(document.createElement("br"))
-    container_book.appendChild(button_search)
-    container_book.appendChild(button_release)
-    container_book.appendChild(document.createElement("br"))
+
+
+    col1.appendChild(input_isbn)
+    row.appendChild(col1)
+
+    col2.appendChild(button_search)
+    col2.appendChild(button_release)
+    row.appendChild(col2)
+    container_book.appendChild(row)
     document.getElementById("main_article").appendChild(container_book)
     organiser.active_slots += 1
 }
@@ -165,16 +179,23 @@ function add_book(search_idx){
         url: $(form_name).attr("action"),
         data: form_data,
         success: function(response) {
-            if(response.success){
-                console.log("nie ma błedów")
-            }
-            let parser = new DOMParser();
-            let parsed_form = parser.parseFromString(response.string_form, 'text/html').body.innerHTML
-
-            let form = document.getElementById("book_form"+search_idx)
-            while (form.firstChild)
+            if(response.book_form) {
+                let form = document.getElementById("book_form"+search_idx)
+                let button_save = document.getElementById("book_button_add"+search_idx)
+                while (form.firstChild)
                     form.removeChild(form.firstChild);
-            form.insertAdjacentHTML('afterbegin',parsed_form)
+                form.remove()
+                button_save.remove()
+                temporary_book_pass_data(search_idx, response)
+          }
+          if(response.success){
+              let handler = document.getElementById("container_book"+search_idx)
+              create_cover_up("success", handler, search_idx)
+          }
+          else if(!response.success){
+              let handler = document.getElementById("container_book"+search_idx)
+              create_cover_up("failure", handler, search_idx)
+          }
         },
         error: function (error){
             console.log(this.error)
@@ -186,7 +207,6 @@ function add_book(search_idx){
 }
 
 function temporary_book_pass_data(search_idx, data){
-
     let div = document.getElementById("container_book"+search_idx)
     let form = document.createElement("form")
     form.id = "book_form" + search_idx
@@ -219,27 +239,32 @@ function wait_for_search_result(search_idx){
     form_data.append('search_idx', search_idx)
     form_data.append('mode', 'searching_book_g_library_results')
 
+
     $.ajax({
         type: 'POST',
         url: "/add_books",
         data: form_data,
         success: function(response) {
-            if(!response["status"]){
+            if(!response.success){
                 //document.getElementById("numb"+search_idx).innerText += 10
             }
             else{
                 clearInterval(organiser.book_slot_timer_progress[search_idx])
-                temporary_book_pass_data(search_idx, response)
                 remove_timer(search_idx)
                 document.getElementById("button_release"+search_idx).disabled = false
+                temporary_book_pass_data(search_idx, response)
             }
         },
         error: function (error){
-            console.log(this.error)
+            clearInterval(organiser.book_slot_timer_progress[search_idx])
+            temporary_book_pass_data(search_idx, response)
+            remove_timer(search_idx)
+            document.getElementById("button_release"+search_idx).disabled = false
+            let handler = document.getElementById("container_book"+search_idx)
+            create_cover_up("failure_chromium", handler, search_idx)
         },
-        cache: false,
         contentType: false,
-        processData: false,
+        processData: false
     });
 }
 
@@ -270,7 +295,6 @@ function search_book_ajax(idx){
       url: "/add_books",
       data: form_data,
       success: function(response) {
-          console.log("success")
           return response
       },
       error: function (error){
@@ -283,21 +307,21 @@ function search_book_ajax(idx){
 }
 
 function clean_after_book_slot(search_idx){
-
     let form = document.getElementById("book_form"+search_idx)
-    while (form.firstChild) {
-        console.log("child")
-        form.removeChild(form.firstChild);
+    if(form){
+        for (let i = 0; i < form.children.length; i++){
+            form.removeChild(form.firstChild);
+        }
+        form.remove()
     }
-    form.remove()
 
     let container = document.getElementById("container_book"+search_idx)
-    while (container.firstChild) {
-        console.log("child")
-        container.removeChild(container.firstChild);
+    if(container){
+        for (let i = 0; i < container.children.length; i++){
+            container.removeChild(container.firstChild);
+        }
+        container.remove()
     }
-    container.remove()
-
     organiser.available_slots[search_idx] = 0
     organiser.active_slots -= 1
 }
@@ -318,9 +342,8 @@ function release_slot_ajax(search_idx) {
       url: $(form_name).attr("action"),
       data: form_data,
       success: function(response) {
-          console.log("usunięto")
+
           clean_after_book_slot(search_idx)
-          console.log(response)
 
           let slots_number = parseInt(document.getElementById("slot_text_idx2").innerHTML)
           document.getElementById("slot_text_idx2").innerHTML = slots_number - 1

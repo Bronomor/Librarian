@@ -3,44 +3,19 @@ from django.db import models
 # Create your models here.
 
 
-class Library(models.Model):
-    name = models.CharField(max_length=50)
-    book_count = models.IntegerField(default=0)
-    shelve_count = models.IntegerField(default=0)
-    category_count = models.IntegerField(default=0)
-
-    def __str__(self):
-        return self.name
-
-
 class Shelve(models.Model):
     name = models.TextField(max_length=200, unique=True, blank=False, null=False)
     details = models.TextField(max_length=500, blank=True, null=True)
-    library = models.ForeignKey(Library, on_delete=models.DO_NOTHING, blank=True, null=True)
 
     def __str__(self):
         return "%s" % self.name
 
     def __unicode__(self):
         return u'%s' % self.name
-
-    def save(self, **kwargs):
-        super().save()
-        self.update_shelve_count()
-
-    def delete(self, **kwargs):
-        super().delete()
-        self.update_shelve_count()
-
-    def update_shelve_count(self):
-        if self.library:
-            self.library.shelve_count = self.library.shelve_set.count()
-            self.library.save()
 
 
 class BookCategory(models.Model):
     name = models.CharField(max_length=300, unique=True)
-    library = models.ForeignKey(Library, on_delete=models.DO_NOTHING, blank=True, null=True)
 
     def __str__(self):
         return "%s" % self.name
@@ -48,21 +23,9 @@ class BookCategory(models.Model):
     def __unicode__(self):
         return u'%s' % self.name
 
-    def save(self, **kwargs):
-        super().save()
-        self.update_category_count()
-
-    def delete(self, **kwargs):
-        super().delete()
-        self.update_category_count()
-
-    def update_category_count(self):
-        if self.library:
-            self.library.category_count = self.library.bookcategory_set.count()
-            self.library.save()
-
 
 class Temporary_book(models.Model):
+    serial_key = models.CharField(max_length=100, null=True, blank=True)
     author = models.CharField(max_length=1000, null=True)
     title = models.CharField(max_length=1000, null=True)
     ISBN = models.CharField(max_length=13)
@@ -84,7 +47,30 @@ class Temporary_book(models.Model):
         return u'%s slot' % self.search_number
 
 
+class Book_to_accept(models.Model):
+    serial_key = models.CharField(max_length=100, null=True, blank=True)
+    author = models.CharField(max_length=1000, null=True)
+    title = models.CharField(max_length=1000, null=True)
+    ISBN = models.CharField(max_length=13)
+    publisher = models.CharField(max_length=350, null=True)
+    published_city = models.CharField(max_length=300, null=True)
+    published_year = models.CharField(max_length=4, null=True)
+    details = models.TextField(max_length=1000, null=True)
+    search_number = models.IntegerField(unique=True)
+    price = models.FloatField(blank=True, null=True)
+    bought_date = models.DateField(blank=True, null=True)
+    physical_location = models.ForeignKey(Shelve, on_delete=models.PROTECT, blank=True, null=True)
+    categories = models.TextField(max_length=1000)
+
+    def __str__(self):
+        return "%s slot" % self.search_number
+
+    def __unicode__(self):
+        return u'%s slot' % self.search_number
+
+
 class Book(models.Model):
+    serial_key = models.CharField(max_length=100, unique=True, blank=False, null=False)
     author = models.CharField(max_length=1000)
     title = models.CharField(max_length=1000)
     ISBN = models.CharField(max_length=13)
@@ -96,7 +82,6 @@ class Book(models.Model):
     details = models.TextField(max_length=1000, blank=True, null=True)
     physical_location = models.ForeignKey(Shelve, on_delete=models.PROTECT)
     categories = models.TextField(max_length=1000, blank=True, null=True)
-    library = models.ForeignKey(Library, on_delete=models.DO_NOTHING, blank=True, null=True)
     categories_fk = models.ManyToManyField(BookCategory, blank=True)
 
     def __str__(self):
@@ -104,19 +89,3 @@ class Book(models.Model):
 
     def __unicode__(self):
         return u'%s' % self.title
-
-    def save(self, **kwargs):
-        super().save()
-        self.update_book_count()
-
-    def delete(self, **kwargs):
-        super().delete()
-        self.update_book_count()
-
-    def update_book_count(self):
-        if self.library:
-            self.library.book_count = self.library.book_set.count()
-            self.library.save()
-
-
-

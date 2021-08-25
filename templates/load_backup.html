@@ -12,7 +12,7 @@
 
 {% block main_header %}
     <p style="font-size: 40px;"> Wczytaj kopie zapasową </p>
-    <button onclick="location.href ='http://127.0.0.1:8000/'" class="btn btn-info" style="float: right; margin: 10px"> Menu </button>
+    <button onclick="location.href ='/'" class="btn btn-info" style="float: right; margin: 10px"> Menu </button>
 {% endblock %}
 
 {% block main_article %}
@@ -43,5 +43,14 @@
 
         <button type="submit" class="btn btn-info"> Rozpocznij kopie zapasową </button>
     </form>
+
+    {% if upload_files and failed %}
+        Nie udało się zaimportować następujących danych
+        {% for elem in failed %}
+            elem
+        {% endfor %}
+    {% elif upload_files %}
+        Pomyślnie zaimportowano wszystkie dane
+    {% endif %}
 
 {% endblock %}

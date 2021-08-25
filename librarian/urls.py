@@ -1,4 +1,4 @@
-"""Librarian URL Configuration
+"""librarian URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/3.2/topics/http/urls/
@@ -16,7 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from books_online.views import add_book_view, main_site, add_shelves, add_category, search_books_view, search_shelves_view, search_category_view, \
-create_backup_view, load_backup_view, statistic_view
+create_backup_view, load_backup_view, statistic_view, test_view
 
 
 urlpatterns = [
@@ -34,5 +34,7 @@ urlpatterns = [
     path('load_backup_view', load_backup_view),
 
     path('statistic_view', statistic_view),
+
+    path('test', test_view)
 
 ]

@@ -1,5 +1,5 @@
 """
-WSGI config for Librarian project.
+WSGI config for librarian project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Librarian.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'librarian.settings')
 
 application = get_wsgi_application()
